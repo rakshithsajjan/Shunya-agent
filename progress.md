@@ -2,6 +2,8 @@
 
 ## 2026-06-30
 
+- Updated `/session` command in `packages/coding-agent/src/modes/interactive/interactive-mode.ts` to calculate and display uncompressed vs compressed token counts, estimated uncompressed input costs, and cost savings metrics when Shunya is active.
+- Committed all files locally and rebuilt the workspace successfully.
 - Completed the task-level tool output batch compression. Registered the `store_evidence` tool dynamically and added the `context` extension hook inside the new Shunya plugin at `packages/coding-agent/examples/extensions/shunya.ts`.
 - Exported `retention-policy.ts` from `packages/agent/src/index.ts`.
 - Cleaned up the automatic registration of `store_evidence` from the core `AgentHarness` constructor to keep baseline and compressed runs directly comparable and restore the core harness test suite compatibility.
