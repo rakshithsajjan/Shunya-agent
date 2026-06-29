@@ -2,6 +2,12 @@
 
 ## 2026-06-30
 
+- Completed the task-level tool output batch compression. Registered the `store_evidence` tool dynamically and added the `context` extension hook inside the new Shunya plugin at `packages/coding-agent/examples/extensions/shunya.ts`.
+- Exported `retention-policy.ts` from `packages/agent/src/index.ts`.
+- Cleaned up the automatic registration of `store_evidence` from the core `AgentHarness` constructor to keep baseline and compressed runs directly comparable and restore the core harness test suite compatibility.
+- Added comprehensive unit and integration tests under `packages/agent/test/harness/retention-policy.test.ts` to verify that raw tool outputs are projected out of context once the `store_evidence` summary is executed.
+- Verified that all 175 tests in the `packages/agent` workspace pass cleanly, and the entire project passes `npm run check`.
+
 - Started the Shunya-owned OpenAI capture and token-accounting overlay in
   `packages/agent`: added `token-accounting.ts`, API request/payload/usage and
   per-turn usage session entries, session append/read helpers, and an

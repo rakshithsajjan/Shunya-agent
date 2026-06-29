@@ -15,6 +15,16 @@ import { compact, DEFAULT_COMPACTION_SETTINGS, prepareCompaction } from "./compa
 import { convertToLlm } from "./messages.ts";
 import { formatPromptTemplateInvocation } from "./prompt-templates.ts";
 import { formatSkillInvocation } from "./skills.ts";
+import {
+	createApiPayloadCapture,
+	createApiRequestCapture,
+	createApiUsageCapture,
+	isOpenAiModel,
+	type OpenAiPricing,
+	type PendingApiCall,
+	TokenAccounting,
+	type TokenAccountingSnapshot,
+} from "./token-accounting.ts";
 import type {
 	AbortResult,
 	AgentHarnessEvent,
@@ -179,6 +189,11 @@ export class AgentHarness<
 	private followUpQueueMode: QueueMode;
 	private nextTurnQueue: AgentMessage[] = [];
 	private handlers = new Map<string, Set<AgentHarnessHandler>>();
+	private tokenAccounting = new TokenAccounting();
+	private pendingApiCalls: PendingApiCall[] = [];
+	private apiCallSequence = 0;
+	private turnIndex = 0;
+	private openAiPricing?: OpenAiPricing;
 
 	constructor(options: AgentHarnessOptions<TSkill, TPromptTemplate, TTool>) {
 		this.env = options.env;
@@ -203,6 +218,7 @@ export class AgentHarness<
 		this.validateToolNames(this.activeToolNames);
 		this.steeringQueueMode = options.steeringMode ?? "one-at-a-time";
 		this.followUpQueueMode = options.followUpMode ?? "one-at-a-time";
+		this.openAiPricing = options.openAiPricing;
 	}
 
 	private getHandlers(type: string): Set<AgentHarnessHandler> | undefined {
@@ -361,13 +377,32 @@ export class AgentHarness<
 			const turnState = getTurnState();
 			const snapshotOptions: AgentHarnessStreamOptions = { ...turnState.streamOptions };
 			const requestOptions = await this.emitBeforeProviderRequest(model, turnState.sessionId, snapshotOptions);
+			let pendingCall: PendingApiCall | undefined;
+			if (isOpenAiModel(model)) {
+				pendingCall = {
+					callId: this.createApiCallId(turnState.sessionId),
+					provider: "openai",
+					model: model.id,
+					turnIndex: this.turnIndex,
+				};
+				await this.session.appendApiCallCapture(
+					createApiRequestCapture(pendingCall, context, this.captureRequestOptions(requestOptions, streamOptions)),
+				);
+				this.pendingApiCalls.push(pendingCall);
+			}
 			return this.models.streamSimple(model, context, {
 				cacheRetention: requestOptions.cacheRetention,
 				headers: requestOptions.headers,
 				maxRetries: requestOptions.maxRetries,
 				maxRetryDelayMs: requestOptions.maxRetryDelayMs,
 				metadata: requestOptions.metadata,
-				onPayload: async (payload) => await this.emitBeforeProviderPayload(model, payload),
+				onPayload: async (payload) => {
+					const finalPayload = await this.emitBeforeProviderPayload(model, payload);
+					if (pendingCall) {
+						await this.session.appendApiPayloadCapture(createApiPayloadCapture(pendingCall, finalPayload));
+					}
+					return finalPayload;
+				},
 				onResponse: async (response) => {
 					const headers = { ...(response.headers as Record<string, string>) };
 					await this.emitOwn(
@@ -381,6 +416,27 @@ export class AgentHarness<
 				timeoutMs: requestOptions.timeoutMs,
 				transport: requestOptions.transport,
 			});
+		};
+	}
+
+	private createApiCallId(sessionId: string): string {
+		this.apiCallSequence++;
+		return `${sessionId}:${this.apiCallSequence}`;
+	}
+
+	private captureRequestOptions(
+		requestOptions: AgentHarnessStreamOptions,
+		streamOptions: Parameters<StreamFn>[2],
+	): Record<string, unknown> {
+		return {
+			cacheRetention: requestOptions.cacheRetention,
+			headers: requestOptions.headers,
+			maxRetries: requestOptions.maxRetries,
+			maxRetryDelayMs: requestOptions.maxRetryDelayMs,
+			metadata: requestOptions.metadata,
+			reasoning: streamOptions?.reasoning,
+			timeoutMs: requestOptions.timeoutMs,
+			transport: requestOptions.transport,
 		};
 	}
 
@@ -488,6 +544,14 @@ export class AgentHarness<
 	private async handleAgentEvent(event: AgentEvent, signal?: AbortSignal): Promise<void> {
 		if (event.type === "message_end") {
 			await this.session.appendMessage(event.message);
+			if (event.message.role === "assistant" && event.message.provider === "openai") {
+				const pendingCall = this.pendingApiCalls.shift();
+				if (pendingCall) {
+					const capture = createApiUsageCapture(pendingCall, event.message, this.openAiPricing);
+					this.tokenAccounting.recordUsage(capture);
+					await this.session.appendApiCallUsage(capture);
+				}
+			}
 			await this.emitAny(event, signal);
 			return;
 		}
@@ -498,6 +562,11 @@ export class AgentHarness<
 			} catch (error) {
 				eventError = error;
 			}
+			const turnUsage = this.tokenAccounting.finishTurn(this.turnIndex);
+			if (turnUsage) {
+				await this.session.appendTurnUsage(turnUsage);
+			}
+			this.turnIndex++;
 			const hadPendingMutations = this.pendingSessionWrites.length > 0;
 			await this.flushPendingSessionWrites();
 			if (eventError) throw eventError;
@@ -965,6 +1034,14 @@ export class AgentHarness<
 
 	async setStreamOptions(streamOptions: AgentHarnessStreamOptions): Promise<void> {
 		this.streamOptions = cloneStreamOptions(streamOptions);
+	}
+
+	setOpenAiPricing(pricing: OpenAiPricing | undefined): void {
+		this.openAiPricing = pricing;
+	}
+
+	getTokenAccountingSnapshot(): TokenAccountingSnapshot {
+		return this.tokenAccounting.getSnapshot();
 	}
 
 	async abort(): Promise<AbortResult> {
