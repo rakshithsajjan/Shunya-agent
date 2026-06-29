@@ -7,7 +7,7 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { type AgentMessage, estimateTokens, projectContext } from "@earendil-works/pi-agent-core";
 import {
 	type AssistantMessage,
 	getProviders,
@@ -5337,7 +5337,32 @@ export class InteractiveMode {
 		info += `${theme.fg("dim", "Tool Calls:")} ${stats.toolCalls}\n`;
 		info += `${theme.fg("dim", "Tool Results:")} ${stats.toolResults}\n`;
 		info += `${theme.fg("dim", "Total:")} ${stats.totalMessages}\n\n`;
-		info += `${theme.bold("Tokens")}\n`;
+
+		const isShunyaActive = this.session.getActiveToolNames().includes("store_evidence");
+		let totalSavedTokens = 0;
+
+		if (isShunyaActive) {
+			const allMessages = this.session.state.messages;
+			for (let i = 0; i < allMessages.length; i++) {
+				const msg = allMessages[i];
+				if (msg.role === "assistant") {
+					const preceding = allMessages.slice(0, i);
+					const projectedPreceding = projectContext(preceding);
+					const projectedSet = new Set(projectedPreceding);
+					for (const pMsg of preceding) {
+						if (!projectedSet.has(pMsg)) {
+							totalSavedTokens += estimateTokens(pMsg);
+						}
+					}
+				}
+			}
+		}
+
+		if (isShunyaActive) {
+			info += `${theme.bold("Tokens (Compressed)")}\n`;
+		} else {
+			info += `${theme.bold("Tokens")}\n`;
+		}
 		info += `${theme.fg("dim", "Input:")} ${stats.tokens.input.toLocaleString()}\n`;
 		info += `${theme.fg("dim", "Output:")} ${stats.tokens.output.toLocaleString()}\n`;
 		if (stats.tokens.cacheRead > 0) {
@@ -5349,8 +5374,36 @@ export class InteractiveMode {
 		info += `${theme.fg("dim", "Total:")} ${stats.tokens.total.toLocaleString()}\n`;
 
 		if (stats.cost > 0) {
-			info += `\n${theme.bold("Cost")}\n`;
-			info += `${theme.fg("dim", "Total:")} ${stats.cost.toFixed(4)}`;
+			info += `\n${theme.bold("Cost (Compressed)")}\n`;
+			info += `${theme.fg("dim", "Total:")} $${stats.cost.toFixed(4)}\n`;
+		}
+
+		if (isShunyaActive && totalSavedTokens > 0) {
+			info += `\n${theme.bold("Tokens (Without Shunya)")}\n`;
+			const uncompressedInput = stats.tokens.input + totalSavedTokens;
+			info += `${theme.fg("dim", "Input:")} ${uncompressedInput.toLocaleString()}\n`;
+			info += `${theme.fg("dim", "Output:")} ${stats.tokens.output.toLocaleString()}\n`;
+			info += `${theme.fg("dim", "Total:")} ${(uncompressedInput + stats.tokens.output + stats.tokens.cacheRead + stats.tokens.cacheWrite).toLocaleString()}\n`;
+
+			if (stats.cost > 0) {
+				const totalInputTokens = stats.tokens.input + stats.tokens.cacheRead;
+				const totalInputCost = this.session.state.messages.reduce((acc, m) => {
+					if (m.role === "assistant") {
+						const asm = m;
+						if (asm.usage?.cost) {
+							return acc + (asm.usage.cost.input + (asm.usage.cost.cacheRead ?? 0));
+						}
+					}
+					return acc;
+				}, 0);
+				const avgInputCost = totalInputTokens > 0 ? totalInputCost / totalInputTokens : 0;
+				const savedCost = totalSavedTokens * avgInputCost;
+				const uncompressedCost = stats.cost + savedCost;
+
+				info += `\n${theme.bold("Cost (Without Shunya)")}\n`;
+				info += `${theme.fg("dim", "Total:")} $${uncompressedCost.toFixed(4)}\n`;
+				info += `\n${theme.fg("accent", `Savings: $${savedCost.toFixed(4)} (${((savedCost / uncompressedCost) * 100).toFixed(1)}%)`)}\n`;
+			}
 		}
 
 		this.chatContainer.addChild(new Spacer(1));
