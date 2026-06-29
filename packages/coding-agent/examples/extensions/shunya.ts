@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
+import { projectContext, storeEvidenceTool } from "@earendil-works/pi-agent-core";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { projectContext, storeEvidenceTool } from "../../../agent/src/harness/retention-policy.ts";
 
 /**
  * Shunya Extension: Implement task-level tool output batch compression
