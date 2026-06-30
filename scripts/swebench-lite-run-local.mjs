@@ -181,9 +181,20 @@ function evaluatorEnv(args) {
 
 async function fetchFirstRows() {
 	const url = "https://datasets-server.huggingface.co/first-rows?dataset=SWE-bench%2FSWE-bench_Lite&config=default&split=test";
-	const response = await fetch(url);
-	if (!response.ok) throw new Error(`Failed to fetch SWE-bench Lite rows: ${response.status} ${response.statusText}`);
-	const body = await response.json();
+	let body;
+	try {
+		const response = await fetch(url);
+		if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+		body = await response.json();
+	} catch (error) {
+		const result = run("curl", ["-fsSL", url], { captureOnly: true });
+		if (result.status !== 0) {
+			throw new Error(
+				`Failed to fetch SWE-bench Lite rows: ${error instanceof Error ? error.message : String(error)}\n${result.stderr.trim()}`,
+			);
+		}
+		body = JSON.parse(result.stdout);
+	}
 	return body.rows.map((entry) => entry.row);
 }
 
