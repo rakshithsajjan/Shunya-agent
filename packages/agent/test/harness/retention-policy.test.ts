@@ -125,6 +125,76 @@ describe("Retention Policy", () => {
 			expect(projected.find((m) => m.role === "toolResult" && m.toolName === "calculate")).toBeDefined();
 			expect(projected.length).toBe(3);
 		});
+
+		it("projects out prior raw tool results when store_evidence is called after reading them", () => {
+			const messages: AgentMessage[] = [
+				{ role: "user", content: [{ type: "text", text: "Start" }], timestamp: 100 },
+				{
+					role: "assistant",
+					content: [{ type: "toolCall", id: "call-1", name: "calculate", arguments: { expression: "1+1" } }],
+					api: "openai",
+					provider: "openai",
+					model: "gpt-4o",
+					stopReason: "toolUse",
+					timestamp: 101,
+					usage: {
+						input: 10,
+						output: 10,
+						cacheRead: 0,
+						cacheWrite: 0,
+						totalTokens: 20,
+						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+					},
+				},
+				{
+					role: "toolResult",
+					toolCallId: "call-1",
+					toolName: "calculate",
+					content: [{ type: "text", text: "1+1 = 2" }],
+					isError: false,
+					timestamp: 102,
+				},
+				{
+					role: "assistant",
+					content: [
+						{
+							type: "toolCall",
+							id: "call-2",
+							name: "store_evidence",
+							arguments: { summary: "Calculation is done" },
+						},
+					],
+					api: "openai",
+					provider: "openai",
+					model: "gpt-4o",
+					stopReason: "toolUse",
+					timestamp: 103,
+					usage: {
+						input: 10,
+						output: 10,
+						cacheRead: 0,
+						cacheWrite: 0,
+						totalTokens: 20,
+						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+					},
+				},
+				{
+					role: "toolResult",
+					toolCallId: "call-2",
+					toolName: "store_evidence",
+					content: [{ type: "text", text: "Evidence stored." }],
+					details: { summary: "Calculation is done", toolCallId: "call-2", timestamp: 104 },
+					isError: false,
+					timestamp: 104,
+				},
+			];
+
+			const projected = projectContext(messages);
+
+			expect(projected.find((m) => m.role === "toolResult" && m.toolName === "calculate")).toBeUndefined();
+			expect(projected.find((m) => m.role === "toolResult" && m.toolName === "store_evidence")).toBeDefined();
+			expect(projected.length).toBe(4);
+		});
 	});
 
 	describe("integration test: AgentHarness context hook", () => {

@@ -7,7 +7,7 @@
 		"configDir": ".pi"
 	},
 	"bin": {
-		"pi": "dist/cli.js"
+		"shn": "dist/cli.js"
 	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -39,6 +39,7 @@
 		"prepublishOnly": "npm run clean && npm run build && npm run shrinkwrap"
 	},
 	"dependencies": {
+		"@dqbd/tiktoken": "1.0.22",
 		"@earendil-works/pi-agent-core": "^0.80.2",
 		"@earendil-works/pi-ai": "^0.80.2",
 		"@earendil-works/pi-tui": "^0.80.2",

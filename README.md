@@ -1,3 +1,32 @@
+# Shunya Agent
+
+Shunya Agent is a Pi fork for token-efficient coding-agent research. The goal is
+to keep Pi's real coding-agent surface available while testing whether context
+retention, evidence cards, and tool-output compression can reduce cost without
+breaking coding quality.
+
+Research anchors:
+
+- [GOAL.md](GOAL.md) - current north star
+- [dev-notes/context-compression/tool-output-compression-research.md](dev-notes/context-compression/tool-output-compression-research.md) - compression ideas, measurements, and cost math
+- [dev-notes/context-compression/session-context-profile.md](dev-notes/context-compression/session-context-profile.md) - measured session composition
+- [dev-notes/context-compression/roadmap.md](dev-notes/context-compression/roadmap.md) - near-term implementation roadmap
+- [analysis/session_context_profile/](analysis/session_context_profile/) - generated CSV/SVG profile outputs
+- [progress.md](progress.md) - chronological work log
+
+Standalone compression estimators live in [scripts/](scripts/) and use only the
+Python standard library:
+
+```bash
+python3 scripts/tool_output_cache_math.py --threshold 2000 --summary-tokens 300
+python3 scripts/turn_by_turn_cache_estimator.py --threshold 2000 --summary-tokens 300 --only-tool-sessions
+python3 scripts/turn_by_turn_same_turn_summary_estimator.py --threshold 2000 --summary-tokens 300 --only-tool-sessions
+python3 scripts/user_turn_batch_compression_estimator.py --threshold 2000 --summary-tokens 300 --only-tool-sessions
+python3 scripts/session_context_profile.py
+```
+
+The upstream Pi README follows for package and development details.
+
 <p align="center">
   <a href="https://pi.dev">
     <img alt="pi logo" src="https://pi.dev/logo-auto.svg" width="128">

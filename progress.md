@@ -2,7 +2,35 @@
 
 ## 2026-06-30
 
-- Updated `/session` command in `packages/coding-agent/src/modes/interactive/interactive-mode.ts` to calculate and display uncompressed vs compressed token counts, estimated uncompressed input costs, and cost savings metrics when Shunya is active.
+- Reviewed the goal-plugin choice with a `gpt-5.4-mini` subagent and locked the
+  v1 benchmark plan to pinned `@narumitw/pi-goal`, currently `0.9.2`, for both
+  Pi Native and Shunya. Added integration checks for identical lifecycle
+  behavior, trace sidecar alignment, and `store_evidence` placement.
+  Verification: docs-only change by direct file read.
+- Added a concrete benchmark work plan to
+  `dev-notes/benchmark/benchmarking-first-principles.md`, covering goal-plugin
+  review, runner command inventory, trace schema lock, SWE-bench Lite adapter,
+  first paired dry run, first result audit, 10-task subset freeze, remaining
+  runs, and final cost/quality report. Verification: docs-only change by direct
+  file read.
+- Updated `dev-notes/benchmark/benchmarking-first-principles.md` with the v1
+  benchmark decision: use a fixed 10-task SWE-bench Lite subset, run both Pi
+  Native and Shunya with `gpt-5.4-mini`, share `@narumitw/pi-goal` as the goal
+  plugin, and compare task quality plus token/cost results. Verification:
+  docs-only change by direct file read.
+- Added `dev-notes/benchmark/benchmarking-first-principles.md` to
+  clarify the controlled-experiment framing for Pi-vs-Shunya benchmarking,
+  explain that cost metadata capture is partly present but not yet packaged as a
+  benchmark trace, and define how to tackle saved evidence through per-run trace
+  JSON plus derived CSV/report outputs. Verification: docs-only change by direct
+  file creation.
+- Completed the Shunya-owned capture path for the real `shn` coding-agent flow. Added a read-only `provider_payload` extension event in `packages/coding-agent`, wired it after mutable provider payload hooks, and updated the Shunya extension to write `<session>.shunya.trace.jsonl` with `api_payload_capture`, `api_call_usage`, and `turn_usage` records while keeping compressed sessions in `<session>.compressed.jsonl`.
+- Fixed the observed compression bug where the model calls `store_evidence` after reading prior tool results, not in the same assistant message as the raw tool call. `projectContext()` now projects raw tool outputs across the user-task batch once evidence is stored, and compressed JSONL sidecars preserve the session header and valid parent links.
+- Verification: `npm run check`, `node node_modules/vitest/dist/cli.js --run test/extensions-runner.test.ts` from `packages/coding-agent`, and `node node_modules/vitest/dist/cli.js --run test/harness/retention-policy.test.ts` from `packages/agent` all passed.
+- Added live Shunya cost-saved percentage to `/session`, calculated as `saved cost / cost without Shunya`, so the session view shows both absolute and percentage savings up to that point. Verification: `npm run check` passed.
+- Added live tool-token savings to `/session`: tool tokens with Shunya, tool tokens without Shunya, and percentage reduced. Extended `calculateShunyaSavings()` with replayed tool-token totals and covered it in `packages/coding-agent/test/shunya-session-cost.test.ts`. Verification: focused Vitest test and `npm run check` passed.
+- Updated `/session` command in `packages/coding-agent/src/modes/interactive/interactive-mode.ts` to calculate and display compressed token totals plus reconstructed savings when Shunya is active.
+- Replaced the savings estimate with turn-by-turn reconstruction in `packages/coding-agent/src/core/shunya-session-cost.ts`, using `@dqbd/tiktoken` to price dropped raw tool outputs and separate first-use versus replayed cache tokens. Added `packages/coding-agent/test/shunya-session-cost.test.ts` and verified `npm run check` plus the focused Vitest case.
 - Committed all files locally and rebuilt the workspace successfully.
 - Completed the task-level tool output batch compression. Registered the `store_evidence` tool dynamically and added the `context` extension hook inside the new Shunya plugin at `packages/coding-agent/examples/extensions/shunya.ts`.
 - Exported `retention-policy.ts` from `packages/agent/src/index.ts`.

@@ -7,7 +7,7 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type AgentMessage, estimateTokens, projectContext } from "@earendil-works/pi-agent-core";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
 	type AssistantMessage,
 	getProviders,
@@ -82,6 +82,7 @@ import { BUILT_IN_PROVIDER_DISPLAY_NAMES } from "../../core/provider-display-nam
 import type { ResourceDiagnostic } from "../../core/resource-loader.ts";
 import { formatMissingSessionCwdPrompt, MissingSessionCwdError } from "../../core/session-cwd.ts";
 import { type SessionContext, SessionManager } from "../../core/session-manager.ts";
+import { calculateShunyaSavings, type ShunyaSavings } from "../../core/shunya-session-cost.ts";
 import { BUILTIN_SLASH_COMMANDS } from "../../core/slash-commands.ts";
 import type { SourceInfo } from "../../core/source-info.ts";
 import { isInstallTelemetryEnabled } from "../../core/telemetry.ts";
@@ -291,6 +292,7 @@ export class InteractiveMode {
 	private onInputCallback?: (text: string) => void;
 	private pendingUserInputs: string[] = [];
 	private activeStatusIndicator: StatusIndicator | undefined = undefined;
+	private lastShunyaSavings: ShunyaSavings | undefined = undefined;
 	private readonly idleStatus = new IdleStatus();
 	private workingMessage: string | undefined = undefined;
 	private workingVisible = true;
@@ -397,6 +399,7 @@ export class InteractiveMode {
 		this.options = options;
 		this.autoTrustOnReloadCwd = options.autoTrustOnReloadCwd;
 		this.runtimeHost.setBeforeSessionInvalidate(() => {
+			this.lastShunyaSavings = undefined;
 			this.resetExtensionUI();
 		});
 		this.runtimeHost.setRebindSession(async () => {
@@ -5339,23 +5342,14 @@ export class InteractiveMode {
 		info += `${theme.fg("dim", "Total:")} ${stats.totalMessages}\n\n`;
 
 		const isShunyaActive = this.session.getActiveToolNames().includes("store_evidence");
-		let totalSavedTokens = 0;
-
-		if (isShunyaActive) {
-			const allMessages = this.session.state.messages;
-			for (let i = 0; i < allMessages.length; i++) {
-				const msg = allMessages[i];
-				if (msg.role === "assistant") {
-					const preceding = allMessages.slice(0, i);
-					const projectedPreceding = projectContext(preceding);
-					const projectedSet = new Set(projectedPreceding);
-					for (const pMsg of preceding) {
-						if (!projectedSet.has(pMsg)) {
-							totalSavedTokens += estimateTokens(pMsg);
-						}
-					}
-				}
-			}
+		const currentShunyaSavings = isShunyaActive
+			? calculateShunyaSavings(this.session.state.messages, (provider: string, modelId: string) =>
+					this.session.modelRegistry.find(provider, modelId),
+				)
+			: undefined;
+		const shunyaSavings = currentShunyaSavings?.tokensSaved ? currentShunyaSavings : this.lastShunyaSavings;
+		if (currentShunyaSavings?.tokensSaved) {
+			this.lastShunyaSavings = currentShunyaSavings;
 		}
 
 		if (isShunyaActive) {
@@ -5378,32 +5372,23 @@ export class InteractiveMode {
 			info += `${theme.fg("dim", "Total:")} $${stats.cost.toFixed(4)}\n`;
 		}
 
-		if (isShunyaActive && totalSavedTokens > 0) {
-			info += `\n${theme.bold("Tokens (Without Shunya)")}\n`;
-			const uncompressedInput = stats.tokens.input + totalSavedTokens;
-			info += `${theme.fg("dim", "Input:")} ${uncompressedInput.toLocaleString()}\n`;
-			info += `${theme.fg("dim", "Output:")} ${stats.tokens.output.toLocaleString()}\n`;
-			info += `${theme.fg("dim", "Total:")} ${(uncompressedInput + stats.tokens.output + stats.tokens.cacheRead + stats.tokens.cacheWrite).toLocaleString()}\n`;
-
-			if (stats.cost > 0) {
-				const totalInputTokens = stats.tokens.input + stats.tokens.cacheRead;
-				const totalInputCost = this.session.state.messages.reduce((acc, m) => {
-					if (m.role === "assistant") {
-						const asm = m;
-						if (asm.usage?.cost) {
-							return acc + (asm.usage.cost.input + (asm.usage.cost.cacheRead ?? 0));
-						}
-					}
-					return acc;
-				}, 0);
-				const avgInputCost = totalInputTokens > 0 ? totalInputCost / totalInputTokens : 0;
-				const savedCost = totalSavedTokens * avgInputCost;
-				const uncompressedCost = stats.cost + savedCost;
-
-				info += `\n${theme.bold("Cost (Without Shunya)")}\n`;
-				info += `${theme.fg("dim", "Total:")} $${uncompressedCost.toFixed(4)}\n`;
-				info += `\n${theme.fg("accent", `Savings: $${savedCost.toFixed(4)} (${((savedCost / uncompressedCost) * 100).toFixed(1)}%)`)}\n`;
-			}
+		if (isShunyaActive && shunyaSavings) {
+			const costWithoutShunya = stats.cost + shunyaSavings.costSaved;
+			const costSavedPercent = costWithoutShunya > 0 ? (shunyaSavings.costSaved / costWithoutShunya) * 100 : 0;
+			const toolTokensReducedPercent =
+				shunyaSavings.toolTokensWithoutShunya > 0
+					? (shunyaSavings.tokensSaved / shunyaSavings.toolTokensWithoutShunya) * 100
+					: 0;
+			info += `\n${theme.bold("Savings")}\n`;
+			info += `${theme.fg("dim", "Saved tokens:")} ${shunyaSavings.tokensSaved.toLocaleString()}\n`;
+			info += `${theme.fg("dim", "  First use:")} ${shunyaSavings.firstUseTokensSaved.toLocaleString()}\n`;
+			info += `${theme.fg("dim", "  Later replays:")} ${shunyaSavings.replayTokensSaved.toLocaleString()}\n`;
+			info += `${theme.fg("dim", "Tool tokens with Shunya:")} ${shunyaSavings.toolTokensWithShunya.toLocaleString()}\n`;
+			info += `${theme.fg("dim", "Tool tokens without Shunya:")} ${shunyaSavings.toolTokensWithoutShunya.toLocaleString()}\n`;
+			info += `${theme.fg("dim", "Tool tokens reduced:")} ${toolTokensReducedPercent.toFixed(1)}%\n`;
+			info += `${theme.fg("dim", "Saved cost:")} $${shunyaSavings.costSaved.toFixed(4)}\n`;
+			info += `${theme.fg("dim", "Cost saved:")} ${costSavedPercent.toFixed(1)}%\n`;
+			info += `${theme.fg("dim", "Cost without Shunya:")} $${costWithoutShunya.toFixed(4)}\n`;
 		}
 
 		this.chatContainer.addChild(new Spacer(1));

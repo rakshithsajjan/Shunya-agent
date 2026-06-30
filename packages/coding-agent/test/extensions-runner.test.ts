@@ -891,4 +891,31 @@ describe("ExtensionRunner", () => {
 			expect(runner.hasHandlers("agent_end")).toBe(false);
 		});
 	});
+
+	describe("provider_payload", () => {
+		it("emits final provider payload metadata to extensions", async () => {
+			const extCode = `
+				export default function(pi) {
+					pi.on("provider_payload", (event) => {
+						globalThis.__providerPayloadEvent = event;
+					});
+				}
+			`;
+			fs.writeFileSync(path.join(extensionsDir, "payload.ts"), extCode);
+
+			const result = await discoverAndLoadExtensions([], tempDir, tempDir);
+			const runner = new ExtensionRunner(result.extensions, result.runtime, tempDir, sessionManager, modelRegistry);
+			const payload = { model: "gpt-test", input: [{ role: "user", content: "hello" }] };
+
+			await runner.emitProviderPayload("openai", "gpt-test", payload);
+
+			expect((globalThis as { __providerPayloadEvent?: unknown }).__providerPayloadEvent).toEqual({
+				type: "provider_payload",
+				provider: "openai",
+				model: "gpt-test",
+				payload,
+			});
+			delete (globalThis as { __providerPayloadEvent?: unknown }).__providerPayloadEvent;
+		});
+	});
 });

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360">
+<rect width="100%" height="100%" fill="#fbfbf8"/>
+<text x="60.0" y="48.0" font-family="Arial, sans-serif" font-size="24" text-anchor="start" fill="#222">Aggregate Session Context Composition</text>
+<text x="60.0" y="76.0" font-family="Arial, sans-serif" font-size="14" text-anchor="start" fill="#222">Total estimated tokens: 89,928,325</text>
+<rect x="60.00" y="120" width="131.08" height="58" fill="#5067A8"/>
+<text x="125.5" y="156.0" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#222">12.1%</text>
+<rect x="60" y="206" width="14" height="14" fill="#5067A8"/>
+<text x="82.0" y="218.0" font-family="Arial, sans-serif" font-size="12" text-anchor="start" fill="#222">Setup/System: 12.1% (10,914,729)</text>
+<rect x="191.08" y="120" width="263.82" height="58" fill="#2E8B57"/>
+<text x="323.0" y="156.0" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#222">24.4%</text>
+<rect x="325" y="206" width="14" height="14" fill="#2E8B57"/>
+<text x="347.0" y="218.0" font-family="Arial, sans-serif" font-size="12" text-anchor="start" fill="#222">User Input: 24.4% (21,967,832)</text>
+<rect x="454.91" y="120" width="30.01" height="58" fill="#D98A24"/>
+<rect x="590" y="206" width="14" height="14" fill="#D98A24"/>
+<text x="612.0" y="218.0" font-family="Arial, sans-serif" font-size="12" text-anchor="start" fill="#222">Assistant Output: 2.8% (2,498,719)</text>
+<rect x="484.91" y="120" width="20.19" height="58" fill="#B84A62"/>
+<rect x="855" y="206" width="14" height="14" fill="#B84A62"/>
+<text x="877.0" y="218.0" font-family="Arial, sans-serif" font-size="12" text-anchor="start" fill="#222">Edit/Diff Input: 1.9% (1,680,757)</text>
+<rect x="505.10" y="120" width="23.60" height="58" fill="#7B61B5"/>
+<rect x="60" y="240" width="14" height="14" fill="#7B61B5"/>
+<text x="82.0" y="252.0" font-family="Arial, sans-serif" font-size="12" text-anchor="start" fill="#222">Other Tool Calls: 2.2% (1,964,808)</text>
+<rect x="528.70" y="120" width="553.20" height="58" fill="#4AA3A2"/>
+<text x="805.3" y="156.0" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#222">51.2%</text>
+<rect x="325" y="240" width="14" height="14" fill="#4AA3A2"/>
+<text x="347.0" y="252.0" font-family="Arial, sans-serif" font-size="12" text-anchor="start" fill="#222">Tool Output: 51.2% (46,063,285)</text>
+<rect x="1081.90" y="120" width="2.38" height="58" fill="#8A8F98"/>
+<rect x="590" y="240" width="14" height="14" fill="#8A8F98"/>
+<text x="612.0" y="252.0" font-family="Arial, sans-serif" font-size="12" text-anchor="start" fill="#222">Reasoning Summary: 0.2% (198,024)</text>
+<rect x="1084.27" y="120" width="55.05" height="58" fill="#C4A83A"/>
+<rect x="855" y="240" width="14" height="14" fill="#C4A83A"/>
+<text x="877.0" y="252.0" font-family="Arial, sans-serif" font-size="12" text-anchor="start" fill="#222">Compaction Summary: 5.1% (4,583,713)</text>
+<rect x="1139.32" y="120" width="0.68" height="58" fill="#A0A0A0"/>
+<rect x="60" y="274" width="14" height="14" fill="#A0A0A0"/>
+<text x="82.0" y="286.0" font-family="Arial, sans-serif" font-size="12" text-anchor="start" fill="#222">Other: 0.1% (56,458)</text>
+</svg>

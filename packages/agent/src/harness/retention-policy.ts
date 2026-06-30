@@ -70,10 +70,9 @@ export function projectContext(messages: AgentMessage[]): AgentMessage[] {
 		return messages;
 	}
 
-	// We split messages into "turns" bounded by assistant messages that call store_evidence.
-	// Since tool calls and their results are bound by the assistant message that emitted them,
-	// if an assistant message contains a store_evidence tool call, we project out ALL raw tool results
-	// from that same tool execution block, leaving only the store_evidence tool call and its result.
+	// We split messages into task batches bounded by user messages. The agent often calls tools,
+	// reads their results, then calls store_evidence in a later assistant message. Once evidence is
+	// stored, all prior raw tool results in that user batch can be projected out.
 	const projected: AgentMessage[] = [];
 
 	// A map to find which assistant message emitted which tool calls
@@ -89,12 +88,18 @@ export function projectContext(messages: AgentMessage[]): AgentMessage[] {
 		}
 	}
 
-	// Keep track of assistant message indices that successfully called store_evidence
-	const compressedAssistantIndices = new Set<number>();
+	const compressedAssistantRanges: Array<{ start: number; end: number }> = [];
 	for (const [callId] of summariesByCallId) {
 		const idx = callIdToAssistantIndex.get(callId);
 		if (idx !== undefined) {
-			compressedAssistantIndices.add(idx);
+			let start = 0;
+			for (let i = idx; i >= 0; i--) {
+				if (messages[i]?.role === "user") {
+					start = i;
+					break;
+				}
+			}
+			compressedAssistantRanges.push({ start, end: idx });
 		}
 	}
 
@@ -108,8 +113,13 @@ export function projectContext(messages: AgentMessage[]): AgentMessage[] {
 			}
 
 			const parentAssistantIdx = callIdToAssistantIndex.get(msg.toolCallId);
-			if (parentAssistantIdx !== undefined && compressedAssistantIndices.has(parentAssistantIdx)) {
-				// Project out (drop) this raw tool result because its assistant turn successfully called store_evidence
+			const isInCompressedBatch =
+				parentAssistantIdx !== undefined &&
+				compressedAssistantRanges.some(
+					(range) => parentAssistantIdx >= range.start && parentAssistantIdx <= range.end,
+				);
+			if (isInCompressedBatch) {
+				// Project out this raw tool result because the batch successfully called store_evidence.
 				continue;
 			}
 		}

@@ -1,6 +1,13 @@
 import type { ImageContent, Model, Models, SimpleStreamOptions, TextContent, Transport } from "@earendil-works/pi-ai";
 import type { AgentEvent, AgentMessage, AgentTool, QueueMode, ThinkingLevel } from "../index.ts";
 import type { Session } from "./session/session.ts";
+import type {
+	ApiPayloadCapture,
+	ApiRequestCapture,
+	ApiUsageCapture,
+	OpenAiPricing,
+	TurnUsageCapture,
+} from "./token-accounting.ts";
 
 /** Result of a fallible operation. Expected failures are returned as `ok: false` instead of thrown. */
 export type Result<TValue, TError> = { ok: true; value: TValue } | { ok: false; error: TError };
@@ -359,6 +366,26 @@ export interface ActiveToolsChangeEntry extends SessionTreeEntryBase {
 	activeToolNames: string[];
 }
 
+export interface ApiCallCaptureEntry extends SessionTreeEntryBase {
+	type: "api_call_capture";
+	capture: ApiRequestCapture;
+}
+
+export interface ApiPayloadCaptureEntry extends SessionTreeEntryBase {
+	type: "api_payload_capture";
+	capture: ApiPayloadCapture;
+}
+
+export interface ApiCallUsageEntry extends SessionTreeEntryBase {
+	type: "api_call_usage";
+	capture: ApiUsageCapture;
+}
+
+export interface TurnUsageEntry extends SessionTreeEntryBase {
+	type: "turn_usage";
+	usage: TurnUsageCapture;
+}
+
 export interface CompactionEntry<T = unknown> extends SessionTreeEntryBase {
 	type: "compaction";
 	summary: string;
@@ -411,6 +438,10 @@ export type SessionTreeEntry =
 	| ThinkingLevelChangeEntry
 	| ModelChangeEntry
 	| ActiveToolsChangeEntry
+	| ApiCallCaptureEntry
+	| ApiPayloadCaptureEntry
+	| ApiCallUsageEntry
+	| TurnUsageEntry
 	| CompactionEntry
 	| BranchSummaryEntry
 	| CustomEntry
@@ -827,6 +858,8 @@ export interface AgentHarnessOptions<
 	/** Curated stream/provider request options. Snapshotted at turn start. */
 	streamOptions?: AgentHarnessStreamOptions;
 	model: Model<any>;
+	/** Optional OpenAI pricing used for Shunya-owned cost accounting. Omit to capture usage with unknown/zero cost. */
+	openAiPricing?: OpenAiPricing;
 	thinkingLevel?: ThinkingLevel;
 	activeToolNames?: string[];
 	steeringMode?: QueueMode;

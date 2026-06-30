@@ -59,5 +59,8 @@
 		"gaxios": {
 			"rimraf": "6.1.2"
 		}
+	},
+	"dependencies": {
+		"@dqbd/tiktoken": "1.0.22"
 	}
 }

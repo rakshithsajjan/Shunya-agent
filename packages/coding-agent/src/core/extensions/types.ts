@@ -654,6 +654,14 @@ export interface BeforeProviderRequestEvent {
 	payload: unknown;
 }
 
+/** Fired with the final provider payload after provider request hooks have run. */
+export interface ProviderPayloadEvent {
+	type: "provider_payload";
+	provider: string;
+	model: string;
+	payload: unknown;
+}
+
 /** Fired after a provider response is received and before the response stream is consumed. */
 export interface AfterProviderResponseEvent {
 	type: "after_provider_response";
@@ -996,6 +1004,7 @@ export type ExtensionEvent =
 	| SessionEvent
 	| ContextEvent
 	| BeforeProviderRequestEvent
+	| ProviderPayloadEvent
 	| AfterProviderResponseEvent
 	| BeforeAgentStartEvent
 	| AgentStartEvent
@@ -1151,6 +1160,7 @@ export interface ExtensionAPI {
 		event: "before_provider_request",
 		handler: ExtensionHandler<BeforeProviderRequestEvent, BeforeProviderRequestEventResult>,
 	): void;
+	on(event: "provider_payload", handler: ExtensionHandler<ProviderPayloadEvent>): void;
 	on(event: "after_provider_response", handler: ExtensionHandler<AfterProviderResponseEvent>): void;
 	on(event: "before_agent_start", handler: ExtensionHandler<BeforeAgentStartEvent, BeforeAgentStartEventResult>): void;
 	on(event: "agent_start", handler: ExtensionHandler<AgentStartEvent>): void;

@@ -977,6 +977,15 @@ export class ExtensionRunner {
 		return currentPayload;
 	}
 
+	async emitProviderPayload(provider: string, model: string, payload: unknown): Promise<void> {
+		await this.emit({
+			type: "provider_payload",
+			provider,
+			model,
+			payload,
+		});
+	}
+
 	async emitBeforeAgentStart(
 		prompt: string,
 		images: ImageContent[] | undefined,

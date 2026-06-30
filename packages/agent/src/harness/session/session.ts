@@ -1,8 +1,12 @@
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import type { AgentMessage } from "../../types.ts";
 import { createBranchSummaryMessage, createCompactionSummaryMessage, createCustomMessage } from "../messages.ts";
+import type { ApiPayloadCapture, ApiRequestCapture, ApiUsageCapture, TurnUsageCapture } from "../token-accounting.ts";
 import type {
 	ActiveToolsChangeEntry,
+	ApiCallCaptureEntry,
+	ApiCallUsageEntry,
+	ApiPayloadCaptureEntry,
 	BranchSummaryEntry,
 	CompactionEntry,
 	CustomEntry,
@@ -16,6 +20,7 @@ import type {
 	SessionStorage,
 	SessionTreeEntry,
 	ThinkingLevelChangeEntry,
+	TurnUsageEntry,
 } from "../types.ts";
 import { SessionError } from "../types.ts";
 
@@ -168,6 +173,62 @@ export class Session<TMetadata extends SessionMetadata = SessionMetadata> {
 			timestamp: new Date().toISOString(),
 			activeToolNames: [...activeToolNames],
 		} satisfies ActiveToolsChangeEntry);
+	}
+
+	async appendApiCallCapture(capture: ApiRequestCapture): Promise<string> {
+		return this.appendTypedEntry({
+			type: "api_call_capture",
+			id: await this.storage.createEntryId(),
+			parentId: await this.storage.getLeafId(),
+			timestamp: new Date().toISOString(),
+			capture,
+		} satisfies ApiCallCaptureEntry);
+	}
+
+	async appendApiPayloadCapture(capture: ApiPayloadCapture): Promise<string> {
+		return this.appendTypedEntry({
+			type: "api_payload_capture",
+			id: await this.storage.createEntryId(),
+			parentId: await this.storage.getLeafId(),
+			timestamp: new Date().toISOString(),
+			capture,
+		} satisfies ApiPayloadCaptureEntry);
+	}
+
+	async appendApiCallUsage(capture: ApiUsageCapture): Promise<string> {
+		return this.appendTypedEntry({
+			type: "api_call_usage",
+			id: await this.storage.createEntryId(),
+			parentId: await this.storage.getLeafId(),
+			timestamp: new Date().toISOString(),
+			capture,
+		} satisfies ApiCallUsageEntry);
+	}
+
+	async appendTurnUsage(usage: TurnUsageCapture): Promise<string> {
+		return this.appendTypedEntry({
+			type: "turn_usage",
+			id: await this.storage.createEntryId(),
+			parentId: await this.storage.getLeafId(),
+			timestamp: new Date().toISOString(),
+			usage,
+		} satisfies TurnUsageEntry);
+	}
+
+	async getApiCallCaptures(): Promise<ApiCallCaptureEntry[]> {
+		return this.storage.findEntries("api_call_capture");
+	}
+
+	async getApiPayloadCaptures(): Promise<ApiPayloadCaptureEntry[]> {
+		return this.storage.findEntries("api_payload_capture");
+	}
+
+	async getApiCallUsages(): Promise<ApiCallUsageEntry[]> {
+		return this.storage.findEntries("api_call_usage");
+	}
+
+	async getTurnUsages(): Promise<TurnUsageEntry[]> {
+		return this.storage.findEntries("turn_usage");
 	}
 
 	async appendCompaction<T = unknown>(

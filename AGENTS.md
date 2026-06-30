@@ -1,5 +1,35 @@
 # Development Rules
 
+## Shunya Research Direction
+
+This fork is `Shunya-agent`: a Pi-derived research harness for testing
+token-efficient coding-agent design. Preserve Pi's working coding-agent surface,
+but make research changes measurement-first and narrowly scoped.
+
+Main research anchors:
+
+- `GOAL.md` for the current objective
+- `dev-notes/context-compression/tool-output-compression-research.md` for
+  compression ideas and cost math
+- `dev-notes/context-compression/session-context-profile.md` for measured session
+  composition
+- `dev-notes/context-compression/roadmap.md` for the near-term plan
+- `scripts/*compression*.py` and `scripts/session_context_profile.py` for
+  replayable estimators
+- `analysis/session_context_profile/` for generated CSV/SVG outputs
+
+When adding retention, compaction, or context-accounting behavior, keep the
+calculation explicit:
+
+- first-seen user/tool/assistant content is uncached/cache-write input
+- later replays of the same content are cached-read input
+- new summaries are uncached/cache-write input on first use and cached after
+- tool-output compression should be evaluated at internal tool-call boundaries,
+  not only at final assistant replies
+
+Keep `progress.md` updated as meaningful work happens: scope, files touched,
+verification commands, outcomes, and follow-up work.
+
 ## Conversational Style
 
 - Keep answers short and concise

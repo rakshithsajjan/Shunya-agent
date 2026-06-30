@@ -331,10 +331,14 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		},
 		onPayload: async (payload, _model) => {
 			const runner = extensionRunnerRef.current;
-			if (!runner?.hasHandlers("before_provider_request")) {
-				return payload;
+			let currentPayload = payload;
+			if (runner?.hasHandlers("before_provider_request")) {
+				currentPayload = await runner.emitBeforeProviderRequest(payload);
 			}
-			return runner.emitBeforeProviderRequest(payload);
+			if (runner?.hasHandlers("provider_payload")) {
+				await runner.emitProviderPayload(_model.provider, _model.id, currentPayload);
+			}
+			return currentPayload;
 		},
 		onResponse: async (response, _model) => {
 			const runner = extensionRunnerRef.current;
