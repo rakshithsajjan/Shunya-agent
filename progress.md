@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-07-01
+
+- Migration and VPS Dockerized Benchmarking:
+  - Configured a clean Dockerized test harness on the Hetzner VPS (root@hermes-hetzner) to execute both variants inside matched SWE-bench task containers.
+  - Patched and verified the API connection key preflight verification using the new OpenAI key inside Docker.
+  - Initiated an unattended 20-task run for both pi-native (Vanilla Pi with goal plugin + cost-logger.ts extension only) and shunya (Shunya with goal plugin + cost-logger.ts + shunya.ts + --shunya flag).
+  - Collected early benchmark results on the first completed task pairs:
+    - Total Cost Savings: Shunya averages 24.34% total cost reduction across completed pairs (astropy-12907 saved 13.0%, astropy-14182 saved 30.7%, astropy-14365 saved 46.9%, astropy-6938 saved 25.4%).
+    - Task Quality: On astropy-7746, pi-native failed to produce a patch (Patch: False) after 6 API calls, whereas shunya completed the task successfully (Patch: True) in 13 API calls.
+  - The benchmark is actively running task 7/20 in the background.
+
 ## 2026-06-30
 
 - Split benchmark instrumentation from Shunya compression: vanilla Pi now loads
