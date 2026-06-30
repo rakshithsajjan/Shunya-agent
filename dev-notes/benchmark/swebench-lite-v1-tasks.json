@@ -1,0 +1,38 @@
+{
+	"benchmark_name": "swe-bench-lite",
+	"split": "lite",
+	"source_dataset": "SWE-bench/SWE-bench_Lite",
+	"source_split": "test",
+	"selection_date": "2026-06-30",
+	"selection_rationale": "Use the first three Django SWE-bench Lite test rows for local pipeline verification on macOS/Colima. The first public Lite rows are Astropy tasks, but the local x86_64 Docker build is unstable under Apple Silicon emulation.",
+	"model": "gpt-5.4-mini",
+	"goal_plugin": "@narumitw/pi-goal",
+	"goal_plugin_version": "0.9.2",
+	"variants": [
+		{
+			"name": "pi-native",
+			"submission_dir": "evaluation/lite/20260630_shunya_pi_native_gpt-5.4-mini"
+		},
+		{
+			"name": "shunya",
+			"submission_dir": "evaluation/lite/20260630_shunya_harness_gpt-5.4-mini"
+		}
+	],
+	"tasks": [
+		{
+			"instance_id": "django__django-10914",
+			"repo": "django/django",
+			"base_commit": "e7fd69d051eaa67cb17f172a39b57253e9cb831a"
+		},
+		{
+			"instance_id": "django__django-10924",
+			"repo": "django/django",
+			"base_commit": "bceadd2788dc2dad53eba0caae172bd8522fd483"
+		},
+		{
+			"instance_id": "django__django-11001",
+			"repo": "django/django",
+			"base_commit": "ef082ebb84f00e38af4e8880d04e8365c2766d34"
+		}
+	]
+}

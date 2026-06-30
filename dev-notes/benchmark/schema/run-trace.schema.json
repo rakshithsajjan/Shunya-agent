@@ -1,0 +1,101 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://shunya-agent.local/benchmark/run-trace.schema.json",
+	"title": "Shunya Benchmark Run Trace",
+	"type": "object",
+	"required": [
+		"benchmark_name",
+		"task_id",
+		"variant",
+		"question",
+		"ground_truth",
+		"goal_plugin",
+		"goal_plugin_version",
+		"model",
+		"final_answer",
+		"success",
+		"patch_produced",
+		"runtime_sec",
+		"tool_calls",
+		"api_calls",
+		"stdout",
+		"stderr",
+		"command",
+		"environment"
+	],
+	"properties": {
+		"benchmark_name": { "type": "string" },
+		"task_id": { "type": "string" },
+		"variant": { "enum": ["pi-native", "shunya"] },
+		"question": { "type": "string" },
+		"ground_truth": { "type": "string" },
+		"goal_plugin": { "type": "string" },
+		"goal_plugin_version": { "type": "string" },
+		"model": { "type": "string" },
+		"token_budget": { "type": ["integer", "null"], "minimum": 1 },
+		"final_answer": { "type": "string" },
+		"success": { "type": "boolean" },
+		"patch_produced": { "type": "boolean" },
+		"patch_path": { "type": ["string", "null"] },
+		"runtime_sec": { "type": "number", "minimum": 0 },
+		"tool_calls": { "type": "integer", "minimum": 0 },
+		"api_calls": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["call_id", "provider", "requested_model", "usage", "pricing_snapshot"],
+				"properties": {
+					"call_id": { "type": "string" },
+					"provider": { "type": "string" },
+					"requested_model": { "type": "string" },
+					"response_model": { "type": "string" },
+					"timestamp": { "type": "string" },
+					"usage": {
+						"type": "object",
+						"required": [
+							"input_tokens",
+							"cached_input_tokens",
+							"cache_write_tokens",
+							"output_tokens",
+							"reasoning_tokens",
+							"total_tokens"
+						],
+						"properties": {
+							"input_tokens": { "type": "integer", "minimum": 0 },
+							"cached_input_tokens": { "type": "integer", "minimum": 0 },
+							"cache_write_tokens": { "type": "integer", "minimum": 0 },
+							"output_tokens": { "type": "integer", "minimum": 0 },
+							"reasoning_tokens": { "type": "integer", "minimum": 0 },
+							"total_tokens": { "type": "integer", "minimum": 0 }
+						}
+					},
+					"pricing_snapshot": {
+						"type": "object",
+						"required": [
+							"currency",
+							"input_per_1m_tokens",
+							"cache_read_per_1m_tokens",
+							"cache_write_per_1m_tokens",
+							"output_per_1m_tokens"
+						],
+						"properties": {
+							"currency": { "type": "string" },
+							"input_per_1m_tokens": { "type": "number", "minimum": 0 },
+							"cache_read_per_1m_tokens": { "type": "number", "minimum": 0 },
+							"cache_write_per_1m_tokens": { "type": "number", "minimum": 0 },
+							"output_per_1m_tokens": { "type": "number", "minimum": 0 }
+						}
+					},
+					"cost_usd": { "type": "number", "minimum": 0 }
+				}
+			}
+		},
+		"events": { "type": "array" },
+		"session_entries": { "type": "array" },
+		"stdout": { "type": "string" },
+		"stderr": { "type": "string" },
+		"command": { "type": "array", "items": { "type": "string" } },
+		"environment": { "type": "object" },
+		"failure_reason": { "type": ["string", "null"] }
+	}
+}

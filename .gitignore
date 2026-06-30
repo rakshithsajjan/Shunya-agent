@@ -39,3 +39,15 @@ plans/
 .pi/hf-sessions/
 .pi/hf-sessions-backup/
 collect.sh
+
+# Benchmark artifacts (large cloned repos, session traces, eval runs)
+dev-notes/benchmark/workspaces/
+dev-notes/benchmark/results/swebench-lite-v1/sessions/
+dev-notes/benchmark/swebench-eval-runs/
+logs/
+gold.*.json
+pi-native-*.json
+shunya-*.json
+dev-notes/benchmark/experiments-local/evaluation/lite/*/trajs/
+dev-notes/benchmark/experiments-local/evaluation/lite/*/swebench-evaluation.*.txt
+dev-notes/benchmark/results/swebench-lite-v1/traces/

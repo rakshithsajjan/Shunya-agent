@@ -58,6 +58,36 @@ pi install npm:@narumitw/pi-statusline
 pi install npm:@alexanderfortin/pi-token-usage
 ```
 
+Use the SWE-bench experiments repository layout for saved quality evidence:
+
+- `evaluation/lite/<date_model>/all_preds.jsonl`
+- `evaluation/lite/<date_model>/metadata.yaml`
+- `evaluation/lite/<date_model>/README.md`
+- `evaluation/lite/<date_model>/trajs/<instance_id>.*`
+- `evaluation/lite/<date_model>/logs/<instance_id>/patch.diff`
+- `evaluation/lite/<date_model>/logs/<instance_id>/report.json`
+- `evaluation/lite/<date_model>/logs/<instance_id>/test_output.txt`
+
+The normalized Shunya trace is an extra local sidecar for cost accounting, not a
+replacement for SWE-bench evaluation logs. Keep it outside the experiments
+submission directory so `python -m analysis.get_results` can prune and
+regenerate submission results without deleting Shunya comparison metadata.
+
+Pinned local verification tasks:
+
+1. `django__django-10914`
+2. `django__django-10924`
+3. `django__django-11001`
+
+The first local Astropy candidates were rejected for this machine because the
+SWE-bench `linux/amd64` Astropy image build was unstable under Apple Silicon
+emulation. The local v1 smoke subset uses Django tasks until the Docker
+execution path is stable enough to include C-extension-heavy repositories.
+
+Use task 1 for the first paired smoke comparison. Use tasks 1-3 for the first
+three-task comparison. The broader 10-task subset should stay blocked until
+these local artifacts verify cleanly.
+
 ## Benchmark Work Plan
 
 Track the benchmark as a sequence of small, auditable tasks. Do not advance to
@@ -89,14 +119,16 @@ the next task until the current one has a saved artifact or a written blocker.
 
 4. SWE-bench Lite adapter
    - Load one SWE-bench Lite instance into an isolated workspace.
-   - Produce the normalized prompt, repository checkout, base commit, and grader
-     config.
-   - Output: one normalized task fixture or trace-ready task descriptor.
+   - Produce the normalized prompt, repository checkout, base commit, grader
+     config, experiments-style prediction, log folder, and trajectory.
+   - Output: one normalized task descriptor plus one experiments-compatible
+     local submission folder.
 
 5. First paired dry run
    - Run one selected SWE-bench Lite task with Pi Native.
    - Run the same task with Shunya.
-   - Use the same model, goal plugin, prompt, environment, and token budget.
+   - Use the same model, goal plugin, prompt, Docker task image, environment,
+     and token budget.
    - Output: two trace files, two patches, and one derived CSV row pair.
 
 6. First result audit
@@ -143,9 +175,43 @@ Both runs must use the same:
 - SWE-bench Lite task subset
 - goal plugin and goal prompt
 - token budget, if used
+- container image digest or Dockerfile plus build args
+- mounted workspace contents and permissions
 
 If more than the harness changes, the cost or quality difference cannot be
 trusted.
+
+## Dockerized Agent Execution
+
+The next benchmark run must execute the agents inside a Docker task container,
+not only verify their patches with Docker after the fact.
+
+This is required because the first one-task run exposed a confound: the two
+agents used separate host workspaces, but local tool behavior and test attempts
+depended on the host Python, installed tools, warmed caches, and prior Docker
+state. Even when both variants solve the same task, those differences can change
+how much setup, dependency probing, and test-discovery work each agent performs.
+
+For the next fair run:
+
+- Build or prepare one task container for the SWE-bench instance.
+- Start both Pi Native and Shunya from the same container image digest.
+- Mount or copy a fresh checkout at the same base commit for each run.
+- Use the same environment variables, PATH, Python, package manager state,
+  locale, user, working directory, file permissions, and network policy.
+- Predefine whether dependency installation and local tests are allowed.
+- Do not let the second variant reuse a mutated workspace, installed packages,
+  build outputs, or generated files from the first variant.
+- Keep SWE-bench `run_evaluation` as the final grader that applies the produced
+  patch and writes `report.json` plus `test_output.txt`.
+
+Order effects still matter. Run paired tasks in both orders:
+
+- task A: Pi Native first, Shunya second
+- task B: Shunya first, Pi Native second
+
+Only compare token/cost deltas after the container image, task prompt, tool
+surface, goal layer, and local-test policy are identical.
 
 ## What Must Be Measured
 
@@ -265,6 +331,49 @@ task_id,variant,model,goal_plugin,success,patch_produced,runtime_sec,tool_calls,
 
 The trace JSON is the source of truth. The CSV and summary report are derived
 from it.
+
+## Local Experiments Verification
+
+The task list is checked in at
+`dev-notes/benchmark/swebench-lite-v1-tasks.json`.
+
+Create the expected local folder skeleton:
+
+```bash
+node scripts/swebench-lite-compare.mjs --scaffold --limit 3
+```
+
+After running Pi Native and Shunya locally on task 1, place artifacts under:
+
+```text
+dev-notes/benchmark/experiments-local/evaluation/lite/20260630_shunya_pi_native_gpt-5.4-mini/
+dev-notes/benchmark/experiments-local/evaluation/lite/20260630_shunya_harness_gpt-5.4-mini/
+dev-notes/benchmark/results/swebench-lite-v1/traces/pi-native/
+dev-notes/benchmark/results/swebench-lite-v1/traces/shunya/
+```
+
+Then verify the one-task smoke comparison:
+
+```bash
+node scripts/swebench-lite-compare.mjs --limit 1
+```
+
+After task 1 verifies, run tasks 1-3 for both variants and verify the
+three-task comparison:
+
+```bash
+node scripts/swebench-lite-compare.mjs --limit 3
+```
+
+Successful verification writes:
+
+- `dev-notes/benchmark/results/swebench-lite-v1/results-1-tasks.csv`
+- `dev-notes/benchmark/results/swebench-lite-v1/summary-1-tasks.md`
+- `dev-notes/benchmark/results/swebench-lite-v1/results-3-tasks.csv`
+- `dev-notes/benchmark/results/swebench-lite-v1/summary-3-tasks.md`
+
+If artifacts are missing, the same command writes a blocker summary and exits
+non-zero. Do not treat missing-artifact summaries as benchmark results.
 
 ## Minimal Build Order
 

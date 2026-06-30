@@ -2,6 +2,33 @@
 
 ## 2026-06-30
 
+- Recorded the fairness issue from the first one-task SWE-bench Lite run:
+  although both Pi Native and Shunya resolved `django__django-10914`, the next
+  benchmark must run the agents inside matched Docker task containers so host
+  Python, installed tools, warmed caches, dependency setup, workspace state, and
+  order effects do not contaminate the token/cost comparison. Updated
+  `dev-notes/benchmark/benchmarking-first-principles.md` to require the same
+  container image digest, fresh base-commit workspace, env vars, PATH, file
+  permissions, local-test policy, and order-balanced runs.
+- Anchored the benchmark plan to the upstream `swe-bench/experiments` evidence
+  layout and pinned the first local SWE-bench Lite verification tasks:
+  `django__django-10914`, `django__django-10924`, and
+  `django__django-11001`. The initial Astropy candidates were rejected for the
+  local smoke subset because their `linux/amd64` image build was unstable under
+  Apple Silicon emulation.
+- Added `dev-notes/benchmark/swebench-lite-v1-tasks.json`,
+  `dev-notes/benchmark/schema/run-trace.schema.json`, and
+  `scripts/swebench-lite-compare.mjs` to scaffold local experiments-style
+  submission folders, validate Pi Native/Shunya artifacts, and derive
+  one-task or three-task comparison CSV/Markdown reports from saved local
+  results.
+- Generated local scaffolds under `dev-notes/benchmark/experiments-local/` and
+  blocker reports under `dev-notes/benchmark/results/swebench-lite-v1/`.
+  Verification: `node scripts/swebench-lite-compare.mjs --scaffold --limit 3`
+  produced the expected missing-artifact failure; `node
+  scripts/swebench-lite-compare.mjs --limit 1` produced the expected one-task
+  missing-artifact failure; `node scripts/swebench-lite-compare.mjs --help`
+  succeeded; `npm run check` passed.
 - Reviewed the goal-plugin choice with a `gpt-5.4-mini` subagent and locked the
   v1 benchmark plan to pinned `@narumitw/pi-goal`, currently `0.9.2`, for both
   Pi Native and Shunya. Added integration checks for identical lifecycle

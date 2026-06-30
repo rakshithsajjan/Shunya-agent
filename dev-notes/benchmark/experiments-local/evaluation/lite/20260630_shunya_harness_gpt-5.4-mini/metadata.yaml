@@ -1,0 +1,16 @@
+info:
+  name: Shunya shunya local benchmark
+  report: dev-notes/benchmark/benchmarking-first-principles.md
+  authors: Rakshith Sajjan
+  site: https://github.com/swe-bench/experiments
+  logo: null
+tags:
+  checked: false
+  model:
+    - gpt-5.4-mini
+  org:
+    - Shunya-agent
+  os_model: false
+  os_system: true
+  system:
+    attempts: "1"
