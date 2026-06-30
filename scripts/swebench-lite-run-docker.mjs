@@ -135,6 +135,7 @@ function run(command, commandArgs, options = {}) {
 		encoding: "utf8",
 		maxBuffer: 1000 * 1000 * 250,
 		timeout: options.timeoutMs,
+		stdio: options.inheritStdio ? "inherit" : undefined,
 	});
 	if (options.captureOnly) return result;
 	if (result.status !== 0) {
@@ -647,11 +648,9 @@ function runEvaluation(args, variant, tasks) {
 			"--instance_ids",
 			...instanceIds,
 		],
-		{ env: evaluatorEnv(args), captureOnly: true },
+		{ env: evaluatorEnv(args), inheritStdio: true },
 	);
-	writeFileSync(join(submissionPath, "swebench-evaluation.stdout.txt"), result.stdout, "utf8");
-	writeFileSync(join(submissionPath, "swebench-evaluation.stderr.txt"), result.stderr, "utf8");
-	if (result.status !== 0) throw new Error(`SWE-bench evaluation failed for ${variant.name}: ${result.stderr || result.stdout}`);
+	if (result.status !== 0) throw new Error(`SWE-bench evaluation failed for ${variant.name}`);
 	copyEvaluationArtifacts(args, variant, tasks, runId);
 }
 
