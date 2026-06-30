@@ -51,3 +51,9 @@ shunya-*.json
 dev-notes/benchmark/experiments-local/evaluation/lite/*/trajs/
 dev-notes/benchmark/experiments-local/evaluation/lite/*/swebench-evaluation.*.txt
 dev-notes/benchmark/results/swebench-lite-v1/traces/
+dev-notes/benchmark/experiments-vps-docker/evaluation/lite/*/trajs/
+dev-notes/benchmark/experiments-vps-docker/evaluation/lite/*/swebench-evaluation.*.txt
+dev-notes/benchmark/results/swebench-lite-vps-docker-20/sessions/
+dev-notes/benchmark/results/swebench-lite-vps-docker-20/traces/
+dev-notes/benchmark/results/swebench-lite-vps-docker-20/prompts/
+dev-notes/benchmark/results/swebench-lite-vps-docker-20/swebench-eval-runs/
