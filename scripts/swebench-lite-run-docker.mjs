@@ -60,6 +60,8 @@ function parseArgs(argv) {
 		runEvaluation: false,
 		force: false,
 		keepImages: false,
+		preflight: true,
+		pruneDocker: true,
 		nodeImage: DEFAULT_NODE_IMAGE,
 		timeoutSec: 1800,
 	};
@@ -83,6 +85,8 @@ function parseArgs(argv) {
 		else if (arg === "--run-evaluation") args.runEvaluation = true;
 		else if (arg === "--force") args.force = true;
 		else if (arg === "--keep-images") args.keepImages = true;
+		else if (arg === "--no-preflight") args.preflight = false;
+		else if (arg === "--no-prune-docker") args.pruneDocker = false;
 		else if (arg === "--help" || arg === "-h") {
 			printHelp();
 			process.exit(0);
@@ -114,6 +118,8 @@ Options:
   --run-evaluation            Run official SWE-bench evaluator after agents
   --force                     Remove existing task/variant artifacts first
   --keep-images               Do not remove task runner/base images after agent runs
+  --no-preflight              Skip Docker/OpenAI API preflight
+  --no-prune-docker           Skip Docker build-cache prune after each task
   --timeout-sec <n>           Per-agent Docker timeout, default: 1800
   --env-file <path>           dotenv file passed to Docker, default: .env
 `);
@@ -154,6 +160,55 @@ function writeJson(path, value) {
 
 function ensureDir(path) {
 	mkdirSync(path, { recursive: true });
+}
+
+function envFromFile(path) {
+	const env = {};
+	if (!existsSync(path)) return env;
+	for (const rawLine of readFileSync(path, "utf8").split("\n")) {
+		const line = rawLine.trim();
+		if (!line || line.startsWith("#")) continue;
+		const match = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+		if (!match) continue;
+		let value = match[2] ?? "";
+		if (
+			(value.startsWith('"') && value.endsWith('"')) ||
+			(value.startsWith("'") && value.endsWith("'"))
+		) {
+			value = value.slice(1, -1);
+		}
+		env[match[1]] = value;
+	}
+	return env;
+}
+
+function preflight(args) {
+	if (!existsSync(args.envFile)) {
+		throw new Error(`Missing env file: ${args.envFile}`);
+	}
+	const fileEnv = envFromFile(args.envFile);
+	if (!fileEnv.OPENAI_API_KEY) {
+		throw new Error(`OPENAI_API_KEY is missing from ${args.envFile}`);
+	}
+	run("docker", ["pull", args.nodeImage]);
+	const script = [
+		"const key = process.env.OPENAI_API_KEY;",
+		"if (!key) { console.error('OPENAI_API_KEY missing inside Docker'); process.exit(2); }",
+		"const response = await fetch('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${key}` } });",
+		"if (!response.ok) { const text = await response.text(); console.error(`OpenAI preflight failed: ${response.status} ${text.slice(0, 240)}`); process.exit(3); }",
+		"console.log('OpenAI preflight ok inside Docker');",
+	].join("\n");
+	run("docker", [
+		"run",
+		"--rm",
+		"--env-file",
+		resolve(args.envFile),
+		args.nodeImage,
+		"node",
+		"--input-type=module",
+		"-e",
+		script,
+	]);
 }
 
 async function fetchFirstRows(limit) {
@@ -278,6 +333,11 @@ function cleanupImages(task, images) {
 	for (const image of [images.runnerImage, images.baseImage]) {
 		run("docker", ["image", "rm", "-f", image], { captureOnly: true });
 	}
+}
+
+function pruneDocker() {
+	run("docker", ["builder", "prune", "-f"], { captureOnly: true });
+	run("docker", ["container", "prune", "-f"], { captureOnly: true });
 }
 
 function experimentsSubmissionPath(args, variant) {
@@ -547,15 +607,7 @@ function shellQuote(value) {
 
 function evaluatorEnv(args) {
 	const env = { ...process.env };
-	if (existsSync(args.envFile)) {
-		for (const rawLine of readFileSync(args.envFile, "utf8").split("\n")) {
-			const line = rawLine.trim();
-			if (!line || line.startsWith("#")) continue;
-			const match = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
-			if (!match) continue;
-			env[match[1]] = match[2]?.replace(/^['"]|['"]$/g, "") ?? "";
-		}
-	}
+	Object.assign(env, envFromFile(args.envFile));
 	const dockerConfig = join(tmpdir(), "shunya-swebench-docker-config");
 	ensureDir(dockerConfig);
 	writeJson(join(dockerConfig, "config.json"), { auths: {} });
@@ -643,6 +695,9 @@ function runCompare(args, tasks) {
 
 async function main() {
 	const args = parseArgs(process.argv.slice(2));
+	if (args.runAgent && args.preflight) {
+		preflight(args);
+	}
 	const rows = await fetchFirstRows(args.limit);
 	const config = writeConfig(args, rows);
 	const tasks = config.tasks;
@@ -668,6 +723,7 @@ async function main() {
 				}
 			} finally {
 				if (!args.keepImages) cleanupImages(task, images);
+				if (args.pruneDocker) pruneDocker();
 			}
 			for (const variant of variants) updatePredictions(args, variant, tasks);
 		}
