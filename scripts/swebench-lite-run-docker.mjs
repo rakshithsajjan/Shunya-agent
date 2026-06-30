@@ -61,6 +61,7 @@ function parseArgs(argv) {
 		force: false,
 		keepImages: false,
 		preflight: true,
+		preflightOnly: false,
 		pruneDocker: true,
 		nodeImage: DEFAULT_NODE_IMAGE,
 		timeoutSec: 1800,
@@ -86,6 +87,7 @@ function parseArgs(argv) {
 		else if (arg === "--force") args.force = true;
 		else if (arg === "--keep-images") args.keepImages = true;
 		else if (arg === "--no-preflight") args.preflight = false;
+		else if (arg === "--preflight-only") args.preflightOnly = true;
 		else if (arg === "--no-prune-docker") args.pruneDocker = false;
 		else if (arg === "--help" || arg === "-h") {
 			printHelp();
@@ -119,6 +121,7 @@ Options:
   --force                     Remove existing task/variant artifacts first
   --keep-images               Do not remove task runner/base images after agent runs
   --no-preflight              Skip Docker/OpenAI API preflight
+  --preflight-only            Run Docker/OpenAI API preflight and exit
   --no-prune-docker           Skip Docker build-cache prune after each task
   --timeout-sec <n>           Per-agent Docker timeout, default: 1800
   --env-file <path>           dotenv file passed to Docker, default: .env
@@ -695,8 +698,12 @@ function runCompare(args, tasks) {
 
 async function main() {
 	const args = parseArgs(process.argv.slice(2));
-	if (args.runAgent && args.preflight) {
+	if ((args.runAgent || args.preflightOnly) && args.preflight) {
 		preflight(args);
+	}
+	if (args.preflightOnly) {
+		console.log("Preflight passed.");
+		return;
 	}
 	const rows = await fetchFirstRows(args.limit);
 	const config = writeConfig(args, rows);
