@@ -9,6 +9,12 @@
   built the workspace there using checked-in generated model catalogs, and made
   the SWE-bench runner resolve the goal plugin from either the repo-local path
   or the standard Pi user package path.
+- Verified the containerized agent-execution path for
+  `django__django-10914` on the Hermes VPS: built a thin image on top of
+  `swebench/sweb.eval.x86_64.django_1776_django-10914:latest` that adds Node
+  from `node:22-bullseye-slim`, mounted `/opt/Shunya-agent` at `/runner`, and
+  confirmed `/runner/pi-test.sh --help` runs from `/testbed` inside the
+  SWE-bench task container.
 - Recorded the fairness issue from the first one-task SWE-bench Lite run:
   although both Pi Native and Shunya resolved `django__django-10914`, the next
   benchmark must run the agents inside matched Docker task containers so host
