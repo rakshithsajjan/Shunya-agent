@@ -2,6 +2,13 @@
 
 ## 2026-06-30
 
+- Split benchmark instrumentation from Shunya compression: vanilla Pi now loads
+  only the shared goal plugin plus `cost-logger.ts`, while Shunya loads the same
+  goal/logger pair plus `shunya.ts` and `--shunya`. Set up `/opt/Shunya-agent`
+  on the Hermes VPS, installed dependencies and pinned `@narumitw/pi-goal@0.9.2`,
+  built the workspace there using checked-in generated model catalogs, and made
+  the SWE-bench runner resolve the goal plugin from either the repo-local path
+  or the standard Pi user package path.
 - Recorded the fairness issue from the first one-task SWE-bench Lite run:
   although both Pi Native and Shunya resolved `django__django-10914`, the next
   benchmark must run the agents inside matched Docker task containers so host

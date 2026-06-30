@@ -3,7 +3,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 
 const DEFAULT_CONFIG = "dev-notes/benchmark/swebench-lite-v1-tasks.json";
 const DEFAULT_WORK_ROOT = "dev-notes/benchmark/workspaces/swebench-lite-v1";
@@ -202,6 +202,18 @@ function writeIfMissing(path, content) {
 
 function workspacePath(args, variant, task) {
 	return join(args.workRoot, variant.name, task.instance_id);
+}
+
+function resolveGoalExtension(args) {
+	const candidates = [
+		resolve(args.goalExtension),
+		join(homedir(), ".pi", "agent", "npm", "node_modules", "@narumitw", "pi-goal", "src", "goal.ts"),
+	];
+	const found = candidates.find((candidate) => existsSync(candidate));
+	if (!found) {
+		throw new Error(`Missing pi-goal extension. Tried: ${candidates.join(", ")}`);
+	}
+	return found;
 }
 
 function cloneTaskWorkspace(args, variant, task, row) {
@@ -405,7 +417,7 @@ function runAgent(args, variant, task, row, workspace, config) {
 	const piScript = resolve("pi-test.sh");
 	const costLoggerPath = resolve(".pi/extensions/cost-logger.ts");
 	const shunyaPath = resolve(".pi/extensions/shunya.ts");
-	const goalExtensionPath = resolve(args.goalExtension);
+	const goalExtensionPath = resolveGoalExtension(args);
 	const prompt = buildPrompt(row);
 	const goalPrompt = buildGoalPrompt(row);
 	const commandArgs = [
