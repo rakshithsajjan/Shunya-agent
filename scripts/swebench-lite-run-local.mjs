@@ -403,7 +403,8 @@ function runAgent(args, variant, task, row, workspace, config) {
 	if (existsSync(sessionDir) && args.force) rmSync(sessionDir, { recursive: true, force: true });
 	ensureDir(sessionDir);
 	const piScript = resolve("pi-test.sh");
-	const extensionPath = resolve(".pi/extensions/shunya.ts");
+	const costLoggerPath = resolve(".pi/extensions/cost-logger.ts");
+	const shunyaPath = resolve(".pi/extensions/shunya.ts");
 	const goalExtensionPath = resolve(args.goalExtension);
 	const prompt = buildPrompt(row);
 	const goalPrompt = buildGoalPrompt(row);
@@ -421,12 +422,14 @@ function runAgent(args, variant, task, row, workspace, config) {
 		"--extension",
 		goalExtensionPath,
 		"--extension",
-		extensionPath,
+		costLoggerPath,
 		"--approve",
 		"-p",
 		prompt,
 	];
-	if (variant.name === "shunya") commandArgs.splice(commandArgs.indexOf("--approve"), 0, "--shunya");
+	if (variant.name === "shunya") {
+		commandArgs.splice(commandArgs.indexOf("--approve"), 0, "--extension", shunyaPath, "--shunya");
+	}
 	const started = Date.now();
 	const result = run(piScript, commandArgs, { cwd: workspace, env: childEnv(args), captureOnly: true });
 	const runtimeSec = (Date.now() - started) / 1000;
