@@ -157,7 +157,7 @@ function ensureDir(path) {
 }
 
 async function fetchFirstRows(limit) {
-	const url = "https://datasets-server.huggingface.co/first-rows?dataset=SWE-bench%2FSWE-bench_Lite&config=default&split=test";
+	const url = `https://datasets-server.huggingface.co/rows?dataset=SWE-bench%2FSWE-bench_Lite&config=default&split=test&offset=0&length=${limit}`;
 	let body;
 	try {
 		const response = await fetch(url);
