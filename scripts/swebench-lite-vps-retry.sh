@@ -12,6 +12,9 @@ if tmux has-session -t "$SESSION" 2>/dev/null; then
 	exit 1
 fi
 
+echo "Compiling latest TypeScript changes..."
+npm run build
+
 tmux new-session -d -s "$SESSION" \
 	"node scripts/swebench-lite-run-docker.mjs --config dev-notes/benchmark/suites/shunya-retry-tasks.json --run-agent --run-evaluation --force"
 
