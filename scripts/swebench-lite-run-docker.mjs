@@ -346,12 +346,13 @@ function ensureRunnerImage(args, task) {
 		"COPY --from=node_source /usr/local/bin/node /usr/local/bin/node",
 		"COPY --from=node_source /usr/local/bin/npm /usr/local/bin/npm",
 		"COPY --from=node_source /usr/local/bin/npx /usr/local/bin/npx",
-		"COPY --from=node_source /usr/local/lib/node_modules /usr/local/lib/node_modules",
+		"COPY --from=node_source /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm",
 		'ENV PATH="/usr/local/bin:${PATH}"',
+		'RUN npm config set fund false && npm config set audit false',
 	];
 	if (needsOpencode) {
 		dockerfileLines.push(
-			"RUN npm install -g opencode-ai opencode-goal-plugin @opencode-ai/plugin 2>&1",
+			"RUN npm install -g opencode-ai opencode-goal-plugin @opencode-ai/plugin",
 		);
 	}
 	dockerfileLines.push("", "WORKDIR /testbed", "");
