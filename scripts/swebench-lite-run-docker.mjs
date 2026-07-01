@@ -577,9 +577,6 @@ function runAgentInDocker(args, config, variant, task, row, images) {
 			`head -3 /bench/prompts/${task.instance_id}/opencode-prompt.md >&2`,
 			// Read prompt and run opencode
 			`PROMPT_CONTENT=$(cat /bench/prompts/${task.instance_id}/opencode-prompt.md)`,
-			`echo "DEBUG: ===PROMPT START===" >&2`,
-			`echo "$PROMPT_CONTENT" >&2`,
-			`echo "DEBUG: ===PROMPT END===" >&2`,
 			`OPENCODE_CONFIG=/bench/prompts/${task.instance_id}/opencode-config.json opencode run "$PROMPT_CONTENT" --model ${shellQuote(opencodeModel)} --format json --auto --dir /testbed 2>/bench/sessions/opencode/${task.instance_id}/opencode.stderr.log`,
 			"status=$?",
 			"set -e",
