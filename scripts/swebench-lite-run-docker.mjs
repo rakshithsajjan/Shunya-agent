@@ -540,12 +540,22 @@ function runAgentInDocker(args, config, variant, task, row, images) {
 			`/goal ${opencodeGoal}\n\n${buildPrompt(row)}`,
 			"utf8",
 		);
-		// Write opencode config inline (avoids .opencode/ gitignore issue)
+		// Write opencode config inline with provider auth from env
+		const apiKeyEnvVar =
+			args.provider === "deepseek" ? "DEEPSEEK_API_KEY" : "OPENAI_API_KEY";
 		const opencodeConfig = JSON.stringify({
 			$schema: "https://opencode.ai/config.json",
 			autoupdate: false,
 			permission: { "*": "allow" },
 			plugin: ["opencode-goal-plugin", "@opencode-ai/plugin"],
+			provider: {
+				[args.provider]: {
+					models: {},
+					options: {
+						apiKey: `{env:${apiKeyEnvVar}}`,
+					},
+				},
+			},
 			command: {
 				goal: {
 					description: "Set a session-scoped goal and auto-continue until complete.",
