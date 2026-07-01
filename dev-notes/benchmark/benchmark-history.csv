@@ -1,1 +1,2 @@
 timestamp,run_id,suite_name,variant,tasks_total,tasks_success,success_rate,total_cost_usd,cost_per_success,total_tokens,runtime_sec
+2026-07-01_11:34:29.822Z,run_2026-07-01_11:34:29.822Z,Testing_Shunya_context_compres,pi-native,2,0,0.00,0.138099,0.000000,549496,232.3\n2026-07-01_11:34:29.822Z,run_2026-07-01_11:34:29.822Z,Testing_Shunya_context_compres,shunya,2,1,50.00,0.116247,0.116247,426700,172.6\n
