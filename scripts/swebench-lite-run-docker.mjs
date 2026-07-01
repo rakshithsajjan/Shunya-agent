@@ -525,10 +525,11 @@ function runAgentInDocker(args, config, variant, task, row, images) {
 
 	const repoRoot = resolve(".");
 	let shellCommand;
+	let opencodeModel;
 
 	if (variant.name === "opencode") {
 		// OpenCode variant: use goal plugin + opencode run
-		const opencodeModel = `${args.provider}/${args.model}`;
+		opencodeModel = `${args.provider}/${args.model}`;
 		const opencodeGoal = buildGoalPrompt(row);
 		// Write prompt with /goal prefix so the goal plugin intercepts it
 		writeFileSync(
