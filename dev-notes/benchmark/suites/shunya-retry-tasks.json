@@ -1,0 +1,33 @@
+{
+	"benchmark_name": "swe-bench-lite",
+	"split": "lite",
+	"source_dataset": "SWE-bench/SWE-bench_Lite",
+	"source_split": "test",
+	"selection_date": "2026-07-01",
+	"selection_rationale": "Testing Shunya context compression bug fixes on previously failing Astropy tasks.",
+	"model": "gpt-5.4-mini",
+	"goal_plugin": "@narumitw/pi-goal",
+	"goal_plugin_version": "0.9.2",
+	"variants": [
+		{
+			"name": "pi-native",
+			"submission_dir": "evaluation/lite/20260701_astropy_retry_pi_native"
+		},
+		{
+			"name": "shunya",
+			"submission_dir": "evaluation/lite/20260701_astropy_retry_shunya"
+		}
+	],
+	"tasks": [
+		{
+			"instance_id": "astropy__astropy-14182",
+			"repo": "astropy/astropy",
+			"base_commit": "eb34e4a648db0de75bc21fc104279be117c7e997"
+		},
+		{
+			"instance_id": "astropy__astropy-14365",
+			"repo": "astropy/astropy",
+			"base_commit": "a5dd469bdcce703b44b806d203ddb000becc1e85"
+		}
+	]
+}
