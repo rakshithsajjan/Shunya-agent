@@ -3,11 +3,8 @@ set -euo pipefail
 
 SESSION="${SESSION:-shunya-retry}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RESULT_ROOT="${RESULT_ROOT:-dev-notes/benchmark/results/swebench-lite-vps-docker-retry}"
-LOG_PATH="$RESULT_ROOT/run.log"
 
 cd "$ROOT"
-mkdir -p "$RESULT_ROOT"
 
 if tmux has-session -t "$SESSION" 2>/dev/null; then
 	echo "tmux session already exists: $SESSION"
@@ -16,8 +13,7 @@ if tmux has-session -t "$SESSION" 2>/dev/null; then
 fi
 
 tmux new-session -d -s "$SESSION" \
-	"node scripts/swebench-lite-run-docker.mjs --config dev-notes/benchmark/shunya-retry-tasks.json --run-agent --run-evaluation --force --result-root $RESULT_ROOT 2>&1 | tee '$LOG_PATH'"
+	"node scripts/swebench-lite-run-docker.mjs --config dev-notes/benchmark/suites/shunya-retry-tasks.json --run-agent --run-evaluation --force"
 
 echo "Started $SESSION"
-echo "Log: $ROOT/$LOG_PATH"
 echo "Attach: tmux attach -t $SESSION"
