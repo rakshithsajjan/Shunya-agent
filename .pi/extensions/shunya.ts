@@ -26,11 +26,7 @@ export default function shunyaExtension(pi: ExtensionAPI) {
 			description: storeEvidenceTool.description,
 			promptSnippet: storeEvidenceTool.promptSnippet,
 			promptGuidelines: storeEvidenceTool.promptGuidelines,
-			parameters: Type.Object({
-				summary: Type.String({
-					description: "Clear summary of findings, paths, schemas, or decisions that must be remembered.",
-				}),
-			}),
+			parameters: storeEvidenceTool.parameters,
 			execute: async (toolCallId, params, signal, onUpdate) => {
 				if (!shunyaEnabled) {
 					throw new Error("Shunya compression is currently disabled. Use /shunya to enable it.");
