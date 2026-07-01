@@ -335,7 +335,6 @@ function runnerImageName(task) {
 function ensureRunnerImage(args, task) {
 	const baseImage = imageNameForTask(task);
 	const runnerImage = runnerImageName(task);
-	const needsOpencode = args.variant === "opencode" || args.variant === "all" || args.variant === "both";
 	run("docker", ["pull", baseImage]);
 	const buildDir = join(tmpdir(), `shunya-swebench-runner-${safeName(task.instance_id)}`);
 	if (existsSync(buildDir)) rmSync(buildDir, { recursive: true, force: true });
@@ -343,19 +342,15 @@ function ensureRunnerImage(args, task) {
 	const dockerfileLines = [
 		`FROM ${args.nodeImage} AS node_source`,
 		`FROM ${baseImage}`,
+		// Copy node binary directly (not a symlink)
 		"COPY --from=node_source /usr/local/bin/node /usr/local/bin/node",
-		"COPY --from=node_source /usr/local/bin/npm /usr/local/bin/npm",
-		"COPY --from=node_source /usr/local/bin/npx /usr/local/bin/npx",
+		// Copy npm module, then symlink (COPY flattens symlinks)
 		"COPY --from=node_source /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm",
+		"RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \\",
+		"    ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx",
 		'ENV PATH="/usr/local/bin:${PATH}"',
-		'RUN npm config set fund false && npm config set audit false',
+		"",
 	];
-	if (needsOpencode) {
-		dockerfileLines.push(
-			"RUN npm install -g opencode-ai opencode-goal-plugin @opencode-ai/plugin",
-		);
-	}
-	dockerfileLines.push("", "WORKDIR /testbed", "");
 	writeFileSync(join(buildDir, "Dockerfile"), dockerfileLines.join("\n"), "utf8");
 	run("docker", ["build", "-q", "-t", runnerImage, buildDir]);
 	rmSync(buildDir, { recursive: true, force: true });
@@ -572,6 +567,8 @@ function runAgentInDocker(args, config, variant, task, row, images) {
 			"set -uo pipefail",
 			"cd /testbed",
 			"set +e",
+			// Install opencode at runtime (build-time DNS is unreliable on VPS)
+			"npm install -g opencode-ai opencode-goal-plugin @opencode-ai/plugin 2>/dev/null",
 			`OPENCODE_CONFIG=/bench/prompts/${task.instance_id}/opencode-config.json opencode run -f /bench/prompts/${task.instance_id}/opencode-prompt.md --model ${shellQuote(opencodeModel)} --format json --auto --dir /testbed 2>/bench/sessions/opencode/${task.instance_id}/opencode.stderr.log`,
 			"status=$?",
 			"set -e",
