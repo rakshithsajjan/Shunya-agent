@@ -5,12 +5,18 @@ export interface StoreEvidenceDetails {
 	summary: string;
 	toolCallId: string;
 	timestamp: number;
+	retain_call_ids?: string[];
 }
 
 const storeEvidenceSchema = Type.Object({
 	summary: Type.String({
 		description: "Clear summary of findings, paths, schemas, or decisions that must be remembered.",
 	}),
+	retain_call_ids: Type.Optional(
+		Type.Array(Type.String(), {
+			description: "Tool call IDs whose raw outputs should be retained exactly in context, avoiding compression.",
+		}),
+	),
 });
 
 type StoreEvidenceParams = Static<typeof storeEvidenceSchema>;
@@ -31,6 +37,7 @@ export const storeEvidenceTool: AgentTool<typeof storeEvidenceSchema, StoreEvide
 	promptGuidelines: [
 		"Call store_evidence at the end of your task/turn sequence to summarize findings.",
 		"After storing evidence, the raw tool results from this turn will be cleared from context in subsequent turns.",
+		"If a tool output contains a stack trace, failing test, or critical file snippet you need for the next step, include its call ID in retain_call_ids to prevent it from being compressed.",
 	],
 	parameters: storeEvidenceSchema,
 	execute: async (toolCallId, params: StoreEvidenceParams) => {
@@ -43,6 +50,7 @@ export const storeEvidenceTool: AgentTool<typeof storeEvidenceSchema, StoreEvide
 			],
 			details: {
 				summary: params.summary,
+				retain_call_ids: params.retain_call_ids,
 				toolCallId,
 				timestamp: Date.now(),
 			} satisfies StoreEvidenceDetails,
@@ -57,11 +65,18 @@ export const storeEvidenceTool: AgentTool<typeof storeEvidenceSchema, StoreEvide
 export function projectContext(messages: AgentMessage[]): AgentMessage[] {
 	// First, identify all store_evidence tool call IDs and their associated summary text
 	const summariesByCallId = new Map<string, string>();
+	const retainedCallIds = new Set<string>();
+
 	for (const msg of messages) {
 		if (msg.role === "toolResult" && msg.toolName === "store_evidence" && msg.details) {
 			const details = msg.details as Partial<StoreEvidenceDetails>;
 			if (details.summary && msg.toolCallId) {
 				summariesByCallId.set(msg.toolCallId, details.summary);
+			}
+			if (details.retain_call_ids && Array.isArray(details.retain_call_ids)) {
+				for (const id of details.retain_call_ids) {
+					retainedCallIds.add(id);
+				}
 			}
 		}
 	}
@@ -108,6 +123,12 @@ export function projectContext(messages: AgentMessage[]): AgentMessage[] {
 			// If this is a tool result...
 			if (msg.toolName === "store_evidence") {
 				// Keep store_evidence itself so the agent knows it was successfully stored
+				projected.push(msg);
+				continue;
+			}
+
+			if (msg.toolCallId && retainedCallIds.has(msg.toolCallId)) {
+				// Explicitly retained
 				projected.push(msg);
 				continue;
 			}

@@ -217,8 +217,9 @@ function preflight(args) {
 	]);
 }
 
-async function fetchFirstRows(limit) {
-	const url = `https://datasets-server.huggingface.co/rows?dataset=SWE-bench%2FSWE-bench_Lite&config=default&split=test&offset=0&length=${limit}`;
+async function fetchFirstRows(limit, targetInstanceIds = null) {
+	const fetchLimit = targetInstanceIds ? 100 : limit;
+	const url = `https://datasets-server.huggingface.co/rows?dataset=SWE-bench%2FSWE-bench_Lite&config=default&split=test&offset=0&length=${fetchLimit}`;
 	let body;
 	try {
 		const response = await fetch(url);
@@ -233,12 +234,18 @@ async function fetchFirstRows(limit) {
 		}
 		body = JSON.parse(result.stdout);
 	}
-	return body.rows.map((entry) => entry.row).slice(0, limit);
+	let rows = body.rows.map((entry) => entry.row);
+	if (targetInstanceIds) {
+		rows = rows.filter((row) => targetInstanceIds.includes(row.instance_id));
+	} else {
+		rows = rows.slice(0, limit);
+	}
+	return rows;
 }
 
-function selectVariants(args) {
-	if (args.variant === "both") return VARIANTS;
-	return VARIANTS.filter((variant) => variant.name === args.variant);
+function selectVariants(args, config) {
+	if (args.variant === "both") return config.variants || VARIANTS;
+	return (config.variants || VARIANTS).filter((variant) => variant.name === args.variant);
 }
 
 function taskFromRow(row) {
@@ -706,10 +713,25 @@ async function main() {
 		console.log("Preflight passed.");
 		return;
 	}
-	const rows = await fetchFirstRows(args.limit);
-	const config = writeConfig(args, rows);
+
+	let config;
+	let targetInstanceIds = null;
+	if (existsSync(args.config)) {
+		config = readJson(args.config);
+		if (config.tasks && config.tasks.length > 0) {
+			targetInstanceIds = config.tasks.map((t) => t.instance_id);
+		}
+	}
+
+	const rows = await fetchFirstRows(args.limit, targetInstanceIds);
+	if (!config) {
+		config = writeConfig(args, rows);
+	} else {
+		// Just ensure the tasks match the fetched rows
+		config.tasks = rows.map(taskFromRow);
+	}
 	const tasks = config.tasks;
-	const variants = selectVariants(args);
+	const variants = selectVariants(args, config);
 	for (const variant of variants) ensureSubmission(args, variant, tasks);
 
 	if (args.runAgent) {

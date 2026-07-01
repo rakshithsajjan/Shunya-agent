@@ -195,6 +195,93 @@ describe("Retention Policy", () => {
 			expect(projected.find((m) => m.role === "toolResult" && m.toolName === "store_evidence")).toBeDefined();
 			expect(projected.length).toBe(4);
 		});
+
+		it("retains specific tool results when retain_call_ids is provided", () => {
+			const messages: AgentMessage[] = [
+				{ role: "user", content: [{ type: "text", text: "Start" }], timestamp: 100 },
+				{
+					role: "assistant",
+					content: [
+						{ type: "toolCall", id: "call-1", name: "calculate", arguments: { expression: "1+1" } },
+						{ type: "toolCall", id: "call-2", name: "calculate", arguments: { expression: "2+2" } },
+					],
+					api: "openai",
+					provider: "openai",
+					model: "gpt-4o",
+					stopReason: "toolUse",
+					timestamp: 101,
+					usage: {
+						input: 0,
+						output: 0,
+						cacheRead: 0,
+						cacheWrite: 0,
+						totalTokens: 0,
+						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+					},
+				},
+				{
+					role: "toolResult",
+					toolCallId: "call-1",
+					toolName: "calculate",
+					content: [{ type: "text", text: "1+1 = 2" }],
+					isError: false,
+					timestamp: 102,
+				},
+				{
+					role: "toolResult",
+					toolCallId: "call-2",
+					toolName: "calculate",
+					content: [{ type: "text", text: "2+2 = 4" }],
+					isError: false,
+					timestamp: 103,
+				},
+				{
+					role: "assistant",
+					content: [
+						{
+							type: "toolCall",
+							id: "call-3",
+							name: "store_evidence",
+							arguments: { summary: "Calculation is done", retain_call_ids: ["call-2"] },
+						},
+					],
+					api: "openai",
+					provider: "openai",
+					model: "gpt-4o",
+					stopReason: "toolUse",
+					timestamp: 104,
+					usage: {
+						input: 0,
+						output: 0,
+						cacheRead: 0,
+						cacheWrite: 0,
+						totalTokens: 0,
+						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+					},
+				},
+				{
+					role: "toolResult",
+					toolCallId: "call-3",
+					toolName: "store_evidence",
+					content: [{ type: "text", text: "Evidence stored." }],
+					details: {
+						summary: "Calculation is done",
+						retain_call_ids: ["call-2"],
+						toolCallId: "call-3",
+						timestamp: 105,
+					},
+					isError: false,
+					timestamp: 105,
+				},
+			];
+
+			const projected = projectContext(messages);
+
+			expect(projected.find((m) => m.role === "toolResult" && m.toolCallId === "call-1")).toBeUndefined();
+			expect(projected.find((m) => m.role === "toolResult" && m.toolCallId === "call-2")).toBeDefined();
+			expect(projected.find((m) => m.role === "toolResult" && m.toolName === "store_evidence")).toBeDefined();
+			expect(projected.length).toBe(5);
+		});
 	});
 
 	describe("integration test: AgentHarness context hook", () => {

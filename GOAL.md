@@ -1,156 +1,81 @@
-# shunya
+# Shunya Goal
 
-Build the most token-efficient coding agent harness we can, using `pi` as the reference system and rebuilding only the parts that prove their value.
+Build the most token-efficient coding-agent harness we can, using `pi` as the
+reference system and changing only the pieces whose value can be measured.
 
-The research question is no longer just "can we build a minimal Python coding agent?" It is:
+## Research Question
 
-> What is the smallest, cleanest harness that lets a coding agent do real work while spending the fewest useful tokens across tools, context, cache reads, cache writes, summaries, and session replay?
+What is the smallest, cleanest harness that lets a coding agent do real work
+while spending the fewest useful tokens across tools, context, cache reads,
+cache writes, summaries, and session replay?
 
-## North Star
+## Principles
 
-shunya should be a measurement-first agent harness for code work:
+- Preserve task success as the first quality signal.
+- Keep context small by default, but keep exact evidence when correctness needs
+  it.
+- Treat cache reads, cache writes, summaries, and replay as architecture costs.
+- Prefer deterministic local compaction before spending model tokens.
+- Make every retention policy measurable against real traces.
+- Attribute quality failures to specific policy decisions whenever possible.
 
-- Keep task success observable
-- Keep context small by default
-- Preserve exact evidence only when it will matter later
-- Treat cache behavior as part of architecture, not an afterthought
-- Prefer local deterministic compaction before spending model tokens
-- Make every context policy measurable against real session traces
+## Current Focus
 
-## Philosophy
+Shunya is testing task-level tool-output retention against Pi Native on
+SWE-bench Lite. The current candidate policy is:
 
-### Token efficiency is the product
-- Count prompt, cache-read, cache-write, output, and tool-result tokens separately
-- Measure policies on full sessions, not isolated examples
-- Optimize for repeated coding turns where old evidence becomes context drag
+1. Let the agent work with full tool outputs during the active turn.
+2. Have the agent call `store_evidence` when it has enough hindsight to
+   summarize the useful facts.
+3. On later turns, project raw tool outputs out of context unless exact output
+   was explicitly retained.
 
-### Keep the core small
-- The harness should be readable in one sitting
-- New behavior defaults to narrow policy modules, not core bloat
-- Every feature should answer: does this reduce useful-token cost, improve success, or make measurement sharper?
-
-### Evidence beats transcript hoarding
-- Tool outputs should degrade into evidence cards, not remain full logs forever
-- File paths, symbols, diagnostics, diffs, and decisions matter more than raw terminal noise
-- Refetchable evidence should be replayed from tools when cheaper than retaining it
-
-### Build for controlled experiments
-- Context assembly must be inspectable
-- Retention policies must be swappable
-- Session traces must support replay and cost comparison
-- Quality failures should be attributable to a policy decision
-
-## Harness Shape
-
-```
-user message
-  -> context builder
-       system prompt
-       repo instructions
-       active session state
-       retained evidence
-       tool schemas
-       cache markers
-  -> LLM provider
-  -> parse tool calls
-  -> execute tools
-  -> classify tool results
-  -> retain exact output, evidence card, summary, or refetch handle
-  -> persist session trace
-  -> measure token and cache cost
-  -> loop or respond
-```
-
-## Core Components
-
-| Component | Responsibility |
-|---|---|
-| `core/` | Agent loop, message model, tool-call lifecycle, policy hooks |
-| `tools/` | Small coding tool set: read, write, edit, bash, grep, find, ls |
-| `context/` | Context builder, repo instructions, budget planner, retention assembly |
-| `retention/` | Exact-retain, truncate, evidence-card, summary, and refetch policies |
-| `cache/` | Provider-aware cache markers and cache-cost accounting |
-| `providers/` | Stub first, then real streaming/function-calling adapters |
-| `sessions/` | JSONL traces with enough structure for replay and policy comparison |
-| `evals/` | Cost estimators, trace replayers, and task-success checks |
-
-## Retention Model
-
-Every tool result should move through an explicit retention decision:
-
-| State | Meaning |
-|---|---|
-| `fresh` | Full result is available in the current turn |
-| `exact` | Keep full output because exact text is needed |
-| `evidence` | Keep structured facts: paths, symbols, diagnostics, decisions |
-| `summary` | Keep compact natural-language context |
-| `refetch` | Drop output and keep a safe tool replay handle |
-| `discarded` | Drop because it has no future task value |
-
-The default research target is task-level batch compression: compress the combined tool-output batch for a user turn when it crosses a threshold, while retaining exact snippets only for data the next turn is likely to need.
+The near-term question is whether this saves cost without losing correctness on
+real coding tasks.
 
 ## Metrics
 
-Track these per session and per turn:
+Track these per run, task, variant, session, and turn when available:
 
-- Raw tool-output tokens
-- Retained-context tokens
-- Input tokens
-- Cache-write tokens
-- Cache-read tokens
-- Output tokens
-- Summary-generation tokens
-- Context rebuild cost
-- Number of tool calls per user turn
-- Refetch count and refetch cost
-- Task success and recovery failures
+- task success and failure reason
+- patch produced
+- runtime
+- tool-call count
+- input tokens
+- cached-input tokens
+- cache-write tokens
+- output and reasoning tokens
+- raw tool-output tokens
+- retained-context tokens
+- summary-generation cost
+- total estimated cost and cost per successful task
 
-## Current Research Anchors
+## Retention States
 
-- Local Codex trace analysis showed tool outputs are heavy-tailed.
-- Outputs above a threshold are a small share of records but dominate stored context.
-- Same-turn batch summaries look more promising than per-output summaries in early cost estimates.
-- The next harness should make that policy real enough to test against coding tasks.
+| State | Meaning |
+| --- | --- |
+| `fresh` | Full result is available in the current turn. |
+| `exact` | Keep full output because exact text matters. |
+| `evidence` | Keep structured facts such as paths, symbols, diagnostics, and decisions. |
+| `summary` | Keep compact natural-language context. |
+| `refetch` | Drop output and keep a safe replay handle. |
+| `discarded` | Drop because it has no expected future value. |
 
-See `tool-output-compression-research.md` for the current measurements and policy sketches.
+## Research Anchors
 
-## Implementation Phases
+- `dev-notes/context-compression/tool-output-compression-research.md`
+- `dev-notes/context-compression/session-context-profile.md`
+- `dev-notes/context-compression/roadmap.md`
+- `dev-notes/benchmark/INDEX.md`
+- `dev-notes/benchmark/EXPERIMENT_PROTOCOL.md`
+- `progress.md`
 
-### Phase 1 - Minimal Measured Harness
-- Stub provider
-- Basic coding tools
-- JSONL session trace
-- Context builder with token accounting
-- Simple CLI: `shunya -p "query"` and REPL mode
+## Success Standard
 
-### Phase 2 - Retention Policies
-- Tool-result classification
-- Exact, evidence-card, summary, refetch, and discard states
-- Task-level batch compression
-- Replayable cost reports over recorded sessions
+A Shunya change is useful only if it improves one of these without hiding the
+tradeoff:
 
-### Phase 3 - Real Providers And Cache Accounting
-- OpenAI provider with streaming/tool calls
-- Anthropic provider with streaming/tool calls
-- Provider-aware cache markers
-- Cost model that separates uncached input, cache writes, cache reads, and output
-
-### Phase 4 - Coding Quality Evals
-- Small coding-task suite
-- Replay traces with different retention policies
-- Measure cost versus task success
-- Identify when compression loses necessary evidence
-
-### Phase 5 - Self-Extension
-- Let shunya edit its own source
-- Keep extension points small and measurable
-- Add skills/prompt templates only when they reduce repeated context cost or improve task success
-
-## Development
-
-```bash
-uv sync
-uv run shunya -p "hello"
-uv run shunya
-uv run pytest
-```
+- lower cost at comparable task success
+- better task success at comparable cost
+- sharper measurement or attribution
+- simpler, smaller harness behavior

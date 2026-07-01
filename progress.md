@@ -2,6 +2,20 @@
 
 ## 2026-07-01
 
+- Guidance cleanup:
+  - Trimmed `GOAL.md` into a lean research north star focused on token
+    efficiency, current SWE-bench retention experiments, metrics, and success
+    criteria.
+  - Reworked `AGENTS.md` into a shorter operating contract with explicit
+    Shunya reading order and benchmark discipline.
+  - Added `dev-notes/benchmark/INDEX.md` as the canonical benchmark map and
+    `dev-notes/benchmark/EXPERIMENT_PROTOCOL.md` as the run storage and
+    validation protocol.
+  - Added the requirement that every benchmark run include a readable
+    `TESTS.md` ledger with all checks, statuses, skipped checks, and evidence
+    paths before the run can be considered canonical.
+  - Verification: documentation-only change, validated by reading edited files.
+
 - Migration and VPS Dockerized Benchmarking:
   - Configured a clean Dockerized test harness on the Hetzner VPS (root@hermes-hetzner) to execute both variants inside matched SWE-bench task containers.
   - Patched and verified the API connection key preflight verification using the new OpenAI key inside Docker.
