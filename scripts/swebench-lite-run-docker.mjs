@@ -15,9 +15,10 @@ import { homedir, tmpdir } from "node:os";
 import { join as pathJoin } from "node:path";
 process.env.PATH = `${pathJoin(homedir(), ".local", "bin")}:${process.env.PATH ?? ""}`;
 
-const DEFAULT_CONFIG = "dev-notes/benchmark/swebench-lite-vps-20-tasks.json";
-const DEFAULT_EXPERIMENTS_ROOT = "dev-notes/benchmark/experiments-vps-docker";
-const DEFAULT_RESULT_ROOT = "dev-notes/benchmark/results/swebench-lite-vps-docker-20";
+const _timestamp = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
+const DEFAULT_CONFIG = "dev-notes/benchmark/suites/v1-10-tasks.json";
+const DEFAULT_RESULT_ROOT = `dev-notes/benchmark/results/runs/run_${_timestamp}`;
+const DEFAULT_EXPERIMENTS_ROOT = `${DEFAULT_RESULT_ROOT}/experiments-vps-docker`;
 const DEFAULT_TRACE_ROOT = `${DEFAULT_RESULT_ROOT}/traces`;
 const DEFAULT_SESSION_ROOT = `${DEFAULT_RESULT_ROOT}/sessions`;
 const DEFAULT_EVALUATION_ROOT = `${DEFAULT_RESULT_ROOT}/swebench-eval-runs`;

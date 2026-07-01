@@ -267,6 +267,42 @@ function totalsFor(rows, variant) {
 	};
 }
 
+function appendToLedger(config, tasks, rows) {
+	const ledgerPath = "dev-notes/benchmark/benchmark-history.csv";
+	if (!existsSync(ledgerPath)) return;
+	
+	const timestamp = new Date().toISOString().replace(/T/, '_').replace(/\\..+/, '');
+	const runId = `run_${timestamp}`;
+	const suiteName = config.selection_rationale?.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_') || "unknown_suite";
+	
+	const lines = [];
+	for (const variant of config.variants) {
+		const totals = totalsFor(rows, variant.name);
+		const rate = totals.count === 0 ? 0 : (totals.successCount / totals.count) * 100;
+		const costPerSuccess = totals.successCount === 0 ? 0 : totals.costUsd / totals.successCount;
+		
+		const rowData = [
+			timestamp,
+			runId,
+			suiteName,
+			variant.name,
+			totals.count,
+			totals.successCount,
+			rate.toFixed(2),
+			totals.costUsd.toFixed(6),
+			costPerSuccess.toFixed(6),
+			totals.totalTokens,
+			totals.runtimeSec.toFixed(1)
+		];
+		lines.push(rowData.join(","));
+	}
+	
+	import("node:fs").then(fs => {
+		fs.appendFileSync(ledgerPath, lines.join("\\n") + "\\n", "utf8");
+		console.log(`Appended ${lines.length} rows to ${ledgerPath}`);
+	});
+}
+
 function writeSummary(path, config, tasks, rows, errors) {
 	const lines = [
 		"# SWE-bench Lite Pi Native vs Shunya Comparison",
@@ -318,6 +354,7 @@ function main() {
 	mkdirSync(args.out, { recursive: true });
 	writeCsv(join(args.out, `results-${tasks.length}-tasks.csv`), rows);
 	writeSummary(join(args.out, `summary-${tasks.length}-tasks.md`), config, tasks, rows, errors);
+	if (errors.length === 0) appendToLedger(config, tasks, rows);
 	writeJson(join(args.out, `verification-${tasks.length}-tasks.json`), { ok: errors.length === 0, errors });
 	if (errors.length > 0) {
 		console.error(`Verification failed with ${errors.length} missing or invalid artifact(s).`);
