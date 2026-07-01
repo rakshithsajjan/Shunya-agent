@@ -7,7 +7,8 @@ results, or agent behavior based on benchmark results.
 
 For the same SWE-bench Lite task, model, goal plugin, and Docker task
 environment, can Shunya match Pi Native quality while reducing useful token
-cost?
+cost? And how does OpenCode compare to both harnesses as a third-party
+baseline?
 
 ## Canonical Run
 
@@ -66,7 +67,37 @@ Concept:
 - This should preserve critical traces, failing tests, or file snippets while
   still compressing the rest of the turn.
 
-## Contaminated Or Non-Canonical Runs
+## OpenCode Harness
+
+A third variant `opencode` has been added to the runner alongside `pi-native`
+and `shunya`. The OpenCode variant uses a different goal layer than the other
+two:
+
+- **Pi Native / Shunya**: `@narumitw/pi-goal@0.9.2` (Pi extension)
+- **OpenCode**: `opencode-goal-plugin@0.4.7` (OpenCode plugin, provides `/goal`
+  command with auto-continue, compaction survival, evidence-based completion,
+  and safety limits)
+
+The goal plugin difference is a controlled variable — OpenCode has no
+equivalent to Pi's `--extension` system, so the idiomatic approach is the
+`opencode-goal-plugin` npm package loaded via OpenCode's `plugin` config.
+
+The goal prompt text is identical across all three variants. The only
+difference is how it's injected: Pi extensions use `--append-system-prompt`,
+OpenCode uses the plugin's `/goal` command which stores the goal in session
+memory and injects it into the system prompt on every turn.
+
+Run all three variants with:
+
+```bash
+node scripts/swebench-lite-run-docker.mjs --limit 20 --variant all --run-agent --run-evaluation
+```
+
+Or a single variant:
+
+```bash
+node scripts/swebench-lite-run-docker.mjs --limit 20 --variant opencode --run-agent --run-evaluation
+```
 
 Do not treat these as clean evidence without rechecking artifact roots:
 

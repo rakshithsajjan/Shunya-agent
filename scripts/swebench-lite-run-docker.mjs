@@ -22,26 +22,39 @@ const DEFAULT_EXPERIMENTS_ROOT = `${DEFAULT_RESULT_ROOT}/experiments-vps-docker`
 const DEFAULT_TRACE_ROOT = `${DEFAULT_RESULT_ROOT}/traces`;
 const DEFAULT_SESSION_ROOT = `${DEFAULT_RESULT_ROOT}/sessions`;
 const DEFAULT_EVALUATION_ROOT = `${DEFAULT_RESULT_ROOT}/swebench-eval-runs`;
-const DEFAULT_PROVIDER = "openai";
-const DEFAULT_MODEL = "gpt-5.4-mini";
+const DEFAULT_PROVIDER = "deepseek";
+const DEFAULT_MODEL = "deepseek-v4-pro";
 const DEFAULT_GOAL_EXTENSION = ".pi/npm/node_modules/@narumitw/pi-goal/src/goal.ts";
 const DEFAULT_NODE_IMAGE = "node:22-bullseye-slim";
-const DEFAULT_PRICING = {
-	currency: "USD",
-	input_per_1m_tokens: 0.75,
-	cache_read_per_1m_tokens: 0.075,
-	cache_write_per_1m_tokens: 0,
-	output_per_1m_tokens: 4.5,
+const PRICING_SNAPSHOTS = {
+	"openai:gpt-5.4-mini": {
+		currency: "USD",
+		input_per_1m_tokens: 0.75,
+		cache_read_per_1m_tokens: 0.075,
+		cache_write_per_1m_tokens: 0,
+		output_per_1m_tokens: 4.5,
+	},
+	"deepseek:deepseek-v4-pro": {
+		currency: "USD",
+		input_per_1m_tokens: 0.435,
+		cache_read_per_1m_tokens: 0.003625,
+		cache_write_per_1m_tokens: 0,
+		output_per_1m_tokens: 0.87,
+	},
 };
 
 const VARIANTS = [
 	{
 		name: "pi-native",
-		submission_dir: "evaluation/lite/20260630_vps_docker_pi_native_gpt-5.4-mini",
+		submission_dir: "evaluation/lite/20260701_vps_docker_pi_native_deepseek-v4-pro",
 	},
 	{
 		name: "shunya",
-		submission_dir: "evaluation/lite/20260630_vps_docker_shunya_gpt-5.4-mini",
+		submission_dir: "evaluation/lite/20260701_vps_docker_shunya_deepseek-v4-pro",
+	},
+	{
+		name: "opencode",
+		submission_dir: "evaluation/lite/20260701_vps_docker_opencode_deepseek-v4-pro",
 	},
 ];
 
@@ -103,8 +116,8 @@ function parseArgs(argv) {
 	if (!Number.isInteger(args.timeoutSec) || args.timeoutSec < 60) {
 		throw new Error("--timeout-sec must be an integer >= 60");
 	}
-	if (!["pi-native", "shunya", "both"].includes(args.variant)) {
-		throw new Error("--variant must be pi-native, shunya, or both");
+	if (!["pi-native", "shunya", "opencode", "both", "all"].includes(args.variant)) {
+		throw new Error("--variant must be pi-native, shunya, opencode, both, or all");
 	}
 	return args;
 }
@@ -112,19 +125,19 @@ function parseArgs(argv) {
 function printHelp() {
 	console.log(`Usage: node scripts/swebench-lite-run-docker.mjs [options]
 
-Runs Pi Native and/or Shunya inside SWE-bench Lite Docker task images, saves
-experiments-style predictions plus normalized trace JSON, then optionally runs
-the official SWE-bench evaluator and derives CSV/Markdown comparison results.
+Runs Pi Native, Shunya, and/or OpenCode inside SWE-bench Lite Docker task images,
+saves experiments-style predictions plus normalized trace JSON, then optionally
+runs the official SWE-bench evaluator and derives CSV/Markdown comparison results.
 
 Options:
   --limit <n>                 Number of SWE-bench Lite test rows, default: 20
-  --variant <name>            pi-native, shunya, or both
+  --variant <name>            pi-native, shunya, opencode, both, or all
   --run-agent                 Spend model tokens and run agents in Docker
   --run-evaluation            Run official SWE-bench evaluator after agents
   --force                     Remove existing task/variant artifacts first
   --keep-images               Do not remove task runner/base images after agent runs
-  --no-preflight              Skip Docker/OpenAI API preflight
-  --preflight-only            Run Docker/OpenAI API preflight and exit
+  --no-preflight              Skip Docker/API preflight
+  --preflight-only            Run Docker/API preflight and exit
   --no-prune-docker           Skip Docker build-cache prune after each task
   --timeout-sec <n>           Per-agent Docker timeout, default: 1800
   --env-file <path>           dotenv file passed to Docker, default: .env
@@ -194,16 +207,18 @@ function preflight(args) {
 		throw new Error(`Missing env file: ${args.envFile}`);
 	}
 	const fileEnv = envFromFile(args.envFile);
-	if (!fileEnv.OPENAI_API_KEY) {
-		throw new Error(`OPENAI_API_KEY is missing from ${args.envFile}`);
+	const envKey = args.provider === "deepseek" ? "DEEPSEEK_API_KEY" : "OPENAI_API_KEY";
+	const modelsUrl = args.provider === "deepseek" ? "https://api.deepseek.com/models" : "https://api.openai.com/v1/models";
+	if (!fileEnv[envKey]) {
+		throw new Error(`${envKey} is missing from ${args.envFile}`);
 	}
 	run("docker", ["pull", args.nodeImage]);
 	const script = [
-		"const key = process.env.OPENAI_API_KEY;",
-		"if (!key) { console.error('OPENAI_API_KEY missing inside Docker'); process.exit(2); }",
-		"const response = await fetch('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${key}` } });",
-		"if (!response.ok) { const text = await response.text(); console.error(`OpenAI preflight failed: ${response.status} ${text.slice(0, 240)}`); process.exit(3); }",
-		"console.log('OpenAI preflight ok inside Docker');",
+		`const key = process.env.${envKey};`,
+		`if (!key) { console.error('${envKey} missing inside Docker'); process.exit(2); }`,
+		`const response = await fetch('${modelsUrl}', { headers: { Authorization: \`Bearer \${key}\` } });`,
+		`if (!response.ok) { const text = await response.text(); console.error('${args.provider} preflight failed: ' + response.status + ' ' + text.slice(0, 240)); process.exit(3); }`,
+		`console.log('${args.provider} preflight ok inside Docker');`,
 	].join("\n");
 	run("docker", [
 		"run",
@@ -245,7 +260,8 @@ async function fetchFirstRows(limit, targetInstanceIds = null) {
 }
 
 function selectVariants(args, config) {
-	if (args.variant === "both") return config.variants || VARIANTS;
+	if (args.variant === "both") return (config.variants || VARIANTS).filter((v) => v.name !== "opencode");
+	if (args.variant === "all") return config.variants || VARIANTS;
 	return (config.variants || VARIANTS).filter((variant) => variant.name === args.variant);
 }
 
@@ -319,25 +335,27 @@ function runnerImageName(task) {
 function ensureRunnerImage(args, task) {
 	const baseImage = imageNameForTask(task);
 	const runnerImage = runnerImageName(task);
+	const needsOpencode = args.variant === "opencode" || args.variant === "all" || args.variant === "both";
 	run("docker", ["pull", baseImage]);
 	const buildDir = join(tmpdir(), `shunya-swebench-runner-${safeName(task.instance_id)}`);
 	if (existsSync(buildDir)) rmSync(buildDir, { recursive: true, force: true });
 	ensureDir(buildDir);
-	writeFileSync(
-		join(buildDir, "Dockerfile"),
-		[
-			`FROM ${args.nodeImage} AS node_source`,
-			`FROM ${baseImage}`,
-			"COPY --from=node_source /usr/local/bin/node /usr/local/bin/node",
-			"COPY --from=node_source /usr/local/bin/npm /usr/local/bin/npm",
-			"COPY --from=node_source /usr/local/bin/npx /usr/local/bin/npx",
-			"COPY --from=node_source /usr/local/lib/node_modules /usr/local/lib/node_modules",
-			'ENV PATH="/usr/local/bin:${PATH}"',
-			"WORKDIR /testbed",
-			"",
-		].join("\n"),
-		"utf8",
-	);
+	const dockerfileLines = [
+		`FROM ${args.nodeImage} AS node_source`,
+		`FROM ${baseImage}`,
+		"COPY --from=node_source /usr/local/bin/node /usr/local/bin/node",
+		"COPY --from=node_source /usr/local/bin/npm /usr/local/bin/npm",
+		"COPY --from=node_source /usr/local/bin/npx /usr/local/bin/npx",
+		"COPY --from=node_source /usr/local/lib/node_modules /usr/local/lib/node_modules",
+		'ENV PATH="/usr/local/bin:${PATH}"',
+	];
+	if (needsOpencode) {
+		dockerfileLines.push(
+			"RUN npm install -g opencode-ai opencode-goal-plugin @opencode-ai/plugin --ignore-scripts",
+		);
+	}
+	dockerfileLines.push("", "WORKDIR /testbed", "");
+	writeFileSync(join(buildDir, "Dockerfile"), dockerfileLines.join("\n"), "utf8");
 	run("docker", ["build", "-q", "-t", runnerImage, buildDir]);
 	rmSync(buildDir, { recursive: true, force: true });
 	return { baseImage, runnerImage };
@@ -411,7 +429,7 @@ function toolCallCount(sessionEntries) {
 	return count;
 }
 
-function usageFromSession(messages) {
+function usageFromSession(args, messages) {
 	const calls = [];
 	let index = 0;
 	for (const entry of messages) {
@@ -438,7 +456,7 @@ function usageFromSession(messages) {
 				reasoning_tokens: reasoningTokens,
 				total_tokens: usage.totalTokens ?? inputTokens + cachedInputTokens + cacheWriteTokens + outputTokens,
 			},
-			pricing_snapshot: DEFAULT_PRICING,
+			pricing_snapshot: pricingSnapshot(message.provider ?? args.provider, message.model ?? args.model),
 			cost_usd: usage.cost?.total ?? 0,
 		});
 	}
@@ -480,6 +498,16 @@ function dockerVolumePath(path) {
 	return resolve(path);
 }
 
+function pricingSnapshot(provider, model) {
+	return PRICING_SNAPSHOTS[`${provider}:${model}`] ?? {
+		currency: "USD",
+		input_per_1m_tokens: 0,
+		cache_read_per_1m_tokens: 0,
+		cache_write_per_1m_tokens: 0,
+		output_per_1m_tokens: 0,
+	};
+}
+
 function runAgentInDocker(args, config, variant, task, row, images) {
 	const submissionPath = experimentsSubmissionPath(args, variant);
 	const logPath = join(submissionPath, "logs", task.instance_id);
@@ -500,42 +528,83 @@ function runAgentInDocker(args, config, variant, task, row, images) {
 	writeFileSync(goalPromptPath, buildGoalPrompt(row), "utf8");
 
 	const repoRoot = resolve(".");
-	const costLoggerPath = "/runner/.pi/extensions/cost-logger.ts";
-	const shunyaPath = "/runner/.pi/extensions/shunya.ts";
-	const goalExtensionPath = "/root/.pi/agent/npm/node_modules/@narumitw/pi-goal/src/goal.ts";
-	const commandArgs = [
-		"/runner/pi-test.sh",
-		"--mode",
-		"json",
-		"--provider",
-		args.provider,
-		"--model",
-		args.model,
-		"--session-dir",
-		`/bench/sessions/${variant.name}/${task.instance_id}`,
-		"--append-system-prompt",
-		readFileSync(goalPromptPath, "utf8"),
-		"--extension",
-		goalExtensionPath,
-		"--extension",
-		costLoggerPath,
-	];
-	if (variant.name === "shunya") {
-		commandArgs.push("--extension", shunyaPath, "--shunya");
-	}
-	commandArgs.push("--approve", "-p", `$(cat /bench/prompts/${task.instance_id}/prompt.md)`);
+	let shellCommand;
 
-	const shellCommand = [
-		"set -uo pipefail",
-		"cd /testbed",
-		`printf '%s\\n' ${shellQuote(buildPrompt(row))} > .shunya-swebench-prompt.md`,
-		"set +e",
-		`${commandArgs.map((arg) => (arg.startsWith("$(") ? `"${arg}"` : shellQuote(arg))).join(" ")}`,
-		"status=$?",
-		"set -e",
-		`git diff --binary > /bench/experiments/${variant.submission_dir}/logs/${task.instance_id}/patch.diff`,
-		"exit $status",
-	].join("\n");
+	if (variant.name === "opencode") {
+		// OpenCode variant: use goal plugin + opencode run
+		const opencodeModel = `${args.provider}/${args.model}`;
+		const opencodeGoal = buildGoalPrompt(row);
+		// Write prompt with /goal prefix so the goal plugin intercepts it
+		writeFileSync(
+			join(promptDir, "opencode-prompt.md"),
+			`/goal ${opencodeGoal}\n\n${buildPrompt(row)}`,
+			"utf8",
+		);
+		// Write opencode config inline (avoids .opencode/ gitignore issue)
+		const opencodeConfig = JSON.stringify({
+			$schema: "https://opencode.ai/config.json",
+			autoupdate: false,
+			permission: { "*": "allow" },
+			plugin: ["opencode-goal-plugin", "@opencode-ai/plugin"],
+			command: {
+				goal: {
+					description: "Set a session-scoped goal and auto-continue until complete.",
+					template: "$ARGUMENTS",
+					agent: "build",
+				},
+			},
+			compaction: { auto: true },
+		});
+		writeFileSync(join(promptDir, "opencode-config.json"), `${opencodeConfig}\n`, "utf8");
+
+		shellCommand = [
+			"set -uo pipefail",
+			"cd /testbed",
+			"set +e",
+			`OPENCODE_CONFIG=/bench/prompts/${task.instance_id}/opencode-config.json opencode run -f /bench/prompts/${task.instance_id}/opencode-prompt.md --model ${shellQuote(opencodeModel)} --format json --auto --dir /testbed 2>/bench/sessions/opencode/${task.instance_id}/opencode.stderr.log`,
+			"status=$?",
+			"set -e",
+			`git diff --binary > /bench/experiments/${variant.submission_dir}/logs/${task.instance_id}/patch.diff`,
+			"exit $status",
+		].join("\n");
+	} else {
+		const costLoggerPath = "/runner/.pi/extensions/cost-logger.ts";
+		const shunyaPath = "/runner/.pi/extensions/shunya.ts";
+		const goalExtensionPath = "/root/.pi/agent/npm/node_modules/@narumitw/pi-goal/src/goal.ts";
+		const commandArgs = [
+			"/runner/pi-test.sh",
+			"--mode",
+			"json",
+			"--provider",
+			args.provider,
+			"--model",
+			args.model,
+			"--session-dir",
+			`/bench/sessions/${variant.name}/${task.instance_id}`,
+			"--append-system-prompt",
+			readFileSync(goalPromptPath, "utf8"),
+			"--extension",
+			goalExtensionPath,
+			"--extension",
+			costLoggerPath,
+		];
+		if (variant.name === "shunya") {
+			commandArgs.push("--extension", shunyaPath, "--shunya");
+		}
+		commandArgs.push("--approve", "-p", `$(cat /bench/prompts/${task.instance_id}/prompt.md)`);
+
+		shellCommand = [
+			"set -uo pipefail",
+			"cd /testbed",
+			`printf '%s\\n' ${shellQuote(buildPrompt(row))} > .shunya-swebench-prompt.md`,
+			"set +e",
+			`${commandArgs.map((arg) => (arg.startsWith("$(") ? `"${arg}"` : shellQuote(arg))).join(" ")}`,
+			"status=$?",
+			"set -e",
+			`git diff --binary > /bench/experiments/${variant.submission_dir}/logs/${task.instance_id}/patch.diff`,
+			"exit $status",
+		].join("\n");
+	}
 
 	const containerName = `shunya-agent-${safeName(variant.name)}-${safeName(task.instance_id)}-${Date.now()}`;
 	const dockerArgs = [
@@ -549,8 +618,16 @@ function runAgentInDocker(args, config, variant, task, row, images) {
 		"HOME=/root",
 		"-v",
 		`${dockerVolumePath(repoRoot)}:/runner:ro`,
-		"-v",
-		`${dockerVolumePath(hostGoalPackageRoot(args))}:/root/.pi/agent/npm/node_modules/@narumitw/pi-goal:ro`,
+	];
+	if (variant.name === "opencode") {
+		// No extra volume needed — opencode config written inline to promptDir
+	} else {
+		dockerArgs.push(
+			"-v",
+			`${dockerVolumePath(hostGoalPackageRoot(args))}:/root/.pi/agent/npm/node_modules/@narumitw/pi-goal:ro`,
+		);
+	}
+	dockerArgs.push(
 		"-v",
 		`${dockerVolumePath(args.resultRoot)}:/bench`,
 		"-v",
@@ -561,58 +638,215 @@ function runAgentInDocker(args, config, variant, task, row, images) {
 		"bash",
 		"-lc",
 		shellCommand,
-	];
+	);
 
 	const started = Date.now();
 	const result = run("docker", dockerArgs, { captureOnly: true, timeoutMs: args.timeoutSec * 1000 });
 	const runtimeSec = (Date.now() - started) / 1000;
-	const sessionFile = latestSessionFile(sessionDir);
-	const sessionEntries = sessionFile ? readJsonl(sessionFile) : [];
-	const patchPath = join(logPath, "patch.diff");
-	const patch = existsSync(patchPath) ? readFileSync(patchPath, "utf8") : "";
-	const tracePath = join(args.traceRoot, variant.name, `${task.instance_id}.trace.json`);
-	const apiCalls = usageFromSession(sessionEntries);
-	writeJson(tracePath, {
-		benchmark_name: config.benchmark_name,
-		task_id: task.instance_id,
-		variant: variant.name,
-		question: row.problem_statement,
-		ground_truth: "SWE-bench evaluator report.json",
-		goal_plugin: config.goal_plugin,
-		goal_plugin_version: config.goal_plugin_version,
-		model: args.model,
-		token_budget: null,
-		final_answer: collectAssistantText(sessionEntries),
-		success: false,
-		patch_produced: patch.trim().length > 0,
-		patch_path: relative(process.cwd(), patchPath),
-		runtime_sec: runtimeSec,
-		tool_calls: toolCallCount(sessionEntries),
-		api_calls: apiCalls,
-		events: [],
-		session_entries: sessionEntries,
-		stdout: result.stdout,
-		stderr: result.stderr,
-		command: ["docker", ...dockerArgs],
-		environment: {
-			provider: args.provider,
+
+	if (variant.name === "opencode") {
+		// Parse opencode NDJSON output for tokens/cost
+		const opencodeStdout = result.stdout;
+		const opencodeStderr = readFileSync(
+			join(sessionDir, "opencode.stderr.log"),
+			"utf8",
+		);
+		const { assistantText, apiCalls, totalCost } = parseOpencodeOutput(
+			args,
+			opencodeStdout,
+			opencodeModel,
+		);
+		const patchPath = join(logPath, "patch.diff");
+		const patch = existsSync(patchPath) ? readFileSync(patchPath, "utf8") : "";
+		const tracePath = join(args.traceRoot, variant.name, `${task.instance_id}.trace.json`);
+		writeJson(tracePath, {
+			benchmark_name: config.benchmark_name,
+			task_id: task.instance_id,
+			variant: variant.name,
+			question: row.problem_statement,
+			ground_truth: "SWE-bench evaluator report.json",
+			goal_plugin: "opencode-goal-plugin",
+			goal_plugin_version: "0.4.7",
+			model: `${args.provider}:${args.model}`,
+			token_budget: null,
+			final_answer: assistantText,
+			success: false,
+			patch_produced: patch.trim().length > 0,
+			patch_path: relative(process.cwd(), patchPath),
+			runtime_sec: runtimeSec,
+			tool_calls: apiCalls.length,
+			api_calls: apiCalls,
+			events: [],
+			session_entries: [],
+			stdout: opencodeStdout,
+			stderr: opencodeStderr,
+			command: ["docker", ...dockerArgs],
+			environment: {
+				provider: args.provider,
+				model: args.model,
+				docker_image: images.runnerImage,
+				base_docker_image: images.baseImage,
+				session_file: null,
+				goal_extension: "opencode-goal-plugin",
+				cost_logger_extension: null,
+				opencode_goal_plugin: true,
+			},
+			failure_reason:
+				result.status === 0 ? "not evaluated yet" : `agent exited ${result.status ?? "timeout"}`,
+		});
+		writeFileSync(
+			join(submissionPath, "trajs", `${task.instance_id}.stdout.txt`),
+			opencodeStdout,
+			"utf8",
+		);
+		writeFileSync(join(logPath, "agent.stderr.txt"), opencodeStderr, "utf8");
+		writeJson(join(logPath, "report.json"), { [task.instance_id]: { resolved: false } });
+		writeFileSync(
+			join(logPath, "test_output.txt"),
+			"SWE-bench evaluation has not been run yet.\n",
+			"utf8",
+		);
+		if (result.status !== 0) {
+			throw new Error(
+				`Agent failed for ${variant.name}/${task.instance_id}: ${opencodeStderr || result.stdout}`,
+			);
+		}
+	} else {
+		const sessionFile = latestSessionFile(sessionDir);
+		const sessionEntries = sessionFile ? readJsonl(sessionFile) : [];
+		const patchPath = join(logPath, "patch.diff");
+		const patch = existsSync(patchPath) ? readFileSync(patchPath, "utf8") : "";
+		const tracePath = join(args.traceRoot, variant.name, `${task.instance_id}.trace.json`);
+		const apiCalls = usageFromSession(args, sessionEntries);
+		const costLoggerPath = "/runner/.pi/extensions/cost-logger.ts";
+		const shunyaPath = "/runner/.pi/extensions/shunya.ts";
+		const goalExtensionPath = "/root/.pi/agent/npm/node_modules/@narumitw/pi-goal/src/goal.ts";
+		writeJson(tracePath, {
+			benchmark_name: config.benchmark_name,
+			task_id: task.instance_id,
+			variant: variant.name,
+			question: row.problem_statement,
+			ground_truth: "SWE-bench evaluator report.json",
+			goal_plugin: config.goal_plugin,
+			goal_plugin_version: config.goal_plugin_version,
 			model: args.model,
-			docker_image: images.runnerImage,
-			base_docker_image: images.baseImage,
-			session_file: sessionFile ? relative(process.cwd(), sessionFile) : null,
-			goal_extension: goalExtensionPath,
-			cost_logger_extension: costLoggerPath,
-			shunya_extension: variant.name === "shunya" ? shunyaPath : null,
-		},
-		failure_reason: result.status === 0 ? "not evaluated yet" : `agent exited ${result.status ?? "timeout"}`,
-	});
-	writeFileSync(join(submissionPath, "trajs", `${task.instance_id}.stdout.txt`), result.stdout, "utf8");
-	writeFileSync(join(logPath, "agent.stderr.txt"), result.stderr, "utf8");
-	writeJson(join(logPath, "report.json"), { [task.instance_id]: { resolved: false } });
-	writeFileSync(join(logPath, "test_output.txt"), "SWE-bench evaluation has not been run yet.\n", "utf8");
-	if (result.status !== 0) {
-		throw new Error(`Agent failed for ${variant.name}/${task.instance_id}: ${result.stderr || result.stdout}`);
+			token_budget: null,
+			final_answer: collectAssistantText(sessionEntries),
+			success: false,
+			patch_produced: patch.trim().length > 0,
+			patch_path: relative(process.cwd(), patchPath),
+			runtime_sec: runtimeSec,
+			tool_calls: toolCallCount(sessionEntries),
+			api_calls: apiCalls,
+			events: [],
+			session_entries: sessionEntries,
+			stdout: result.stdout,
+			stderr: result.stderr,
+			command: ["docker", ...dockerArgs],
+			environment: {
+				provider: args.provider,
+				model: args.model,
+				docker_image: images.runnerImage,
+				base_docker_image: images.baseImage,
+				session_file: sessionFile ? relative(process.cwd(), sessionFile) : null,
+				goal_extension: goalExtensionPath,
+				cost_logger_extension: costLoggerPath,
+				shunya_extension: variant.name === "shunya" ? shunyaPath : null,
+			},
+			failure_reason:
+				result.status === 0 ? "not evaluated yet" : `agent exited ${result.status ?? "timeout"}`,
+		});
+		writeFileSync(
+			join(submissionPath, "trajs", `${task.instance_id}.stdout.txt`),
+			result.stdout,
+			"utf8",
+		);
+		writeFileSync(join(logPath, "agent.stderr.txt"), result.stderr, "utf8");
+		writeJson(join(logPath, "report.json"), { [task.instance_id]: { resolved: false } });
+		writeFileSync(
+			join(logPath, "test_output.txt"),
+			"SWE-bench evaluation has not been run yet.\n",
+			"utf8",
+		);
+		if (result.status !== 0) {
+			throw new Error(
+				`Agent failed for ${variant.name}/${task.instance_id}: ${result.stderr || result.stdout}`,
+			);
+		}
 	}
+}
+
+/**
+ * Parse opencode run --format json NDJSON output.
+ * Returns assistant text, API call entries, and total cost.
+ */
+function parseOpencodeOutput(args, stdout, opencodeModel) {
+	const lines = stdout.trim().split("\n").filter(Boolean);
+	const textParts = [];
+	let totalCost = 0;
+	let totalInput = 0;
+	let totalCachedInput = 0;
+	let totalCacheWrite = 0;
+	let totalOutput = 0;
+	let totalReasoning = 0;
+	let sessionID = null;
+	let callIndex = 0;
+
+	for (const line of lines) {
+		let event;
+		try {
+			event = JSON.parse(line);
+		} catch {
+			continue;
+		}
+		if (event.type === "text") {
+			textParts.push(event.part?.text ?? "");
+		}
+		if (event.type === "step_start") {
+			sessionID = event.sessionID;
+		}
+		if (event.type === "step_finish") {
+			const tokens = event.part?.tokens;
+			if (tokens) {
+				callIndex += 1;
+				totalInput += tokens.input ?? 0;
+				totalCachedInput += tokens.cache?.read ?? 0;
+				totalCacheWrite += tokens.cache?.write ?? 0;
+				totalOutput += tokens.output ?? 0;
+				totalReasoning += tokens.reasoning ?? 0;
+			}
+			const cost = event.part?.cost ?? 0;
+			totalCost += cost;
+		}
+	}
+
+	const provider = opencodeModel.split("/")[0];
+	const model = opencodeModel.split("/")[1] ?? opencodeModel;
+	const apiCalls = [
+		{
+			call_id: `opencode:${sessionID ?? "unknown"}`,
+			provider,
+			requested_model: model,
+			response_model: model,
+			timestamp: new Date().toISOString(),
+			usage: {
+				input_tokens: totalInput,
+				cached_input_tokens: totalCachedInput,
+				cache_write_tokens: totalCacheWrite,
+				output_tokens: totalOutput,
+				reasoning_tokens: totalReasoning,
+				total_tokens: totalInput + totalCachedInput + totalCacheWrite + totalOutput + totalReasoning,
+			},
+			pricing_snapshot: pricingSnapshot(provider, model),
+			cost_usd: totalCost,
+		},
+	];
+
+	return {
+		assistantText: textParts.join("\n"),
+		apiCalls,
+		totalCost,
+	};
 }
 
 function shellQuote(value) {

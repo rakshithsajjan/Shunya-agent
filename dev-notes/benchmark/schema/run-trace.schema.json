@@ -26,7 +26,7 @@
 	"properties": {
 		"benchmark_name": { "type": "string" },
 		"task_id": { "type": "string" },
-		"variant": { "enum": ["pi-native", "shunya"] },
+		"variant": { "enum": ["pi-native", "shunya", "opencode"] },
 		"question": { "type": "string" },
 		"ground_truth": { "type": "string" },
 		"goal_plugin": { "type": "string" },
