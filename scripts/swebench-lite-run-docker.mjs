@@ -12,6 +12,8 @@ import {
 import { dirname, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { homedir, tmpdir } from "node:os";
+import { join as pathJoin } from "node:path";
+process.env.PATH = `${pathJoin(homedir(), ".local", "bin")}:${process.env.PATH ?? ""}`;
 
 const DEFAULT_CONFIG = "dev-notes/benchmark/swebench-lite-vps-20-tasks.json";
 const DEFAULT_EXPERIMENTS_ROOT = "dev-notes/benchmark/experiments-vps-docker";
