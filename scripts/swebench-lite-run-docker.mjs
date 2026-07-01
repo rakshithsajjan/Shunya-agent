@@ -570,7 +570,17 @@ function runAgentInDocker(args, config, variant, task, row, images) {
 			"set +e",
 			// Install opencode at runtime (build-time DNS is unreliable on VPS)
 			"npm install -g opencode-ai opencode-goal-plugin @opencode-ai/plugin 2>/dev/null",
-			`OPENCODE_CONFIG=/bench/prompts/${task.instance_id}/opencode-config.json opencode run -f /bench/prompts/${task.instance_id}/opencode-prompt.md --model ${shellQuote(opencodeModel)} --format json --auto --dir /testbed 2>/bench/sessions/opencode/${task.instance_id}/opencode.stderr.log`,
+			// Debug: check file exists and has content
+			`echo "DEBUG: checking prompt file" >&2`,
+			`ls -la /bench/prompts/${task.instance_id}/opencode-prompt.md >&2`,
+			`wc -c /bench/prompts/${task.instance_id}/opencode-prompt.md >&2`,
+			`head -3 /bench/prompts/${task.instance_id}/opencode-prompt.md >&2`,
+			// Read prompt and run opencode
+			`PROMPT_CONTENT=$(cat /bench/prompts/${task.instance_id}/opencode-prompt.md)`,
+			`echo "DEBUG: ===PROMPT START===" >&2`,
+			`echo "$PROMPT_CONTENT" >&2`,
+			`echo "DEBUG: ===PROMPT END===" >&2`,
+			`OPENCODE_CONFIG=/bench/prompts/${task.instance_id}/opencode-config.json opencode run "$PROMPT_CONTENT" --model ${shellQuote(opencodeModel)} --format json --auto --dir /testbed 2>/bench/sessions/opencode/${task.instance_id}/opencode.stderr.log`,
 			"status=$?",
 			"set -e",
 			`git diff --binary > /bench/experiments/${variant.submission_dir}/logs/${task.instance_id}/patch.diff`,
