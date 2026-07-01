@@ -81,6 +81,7 @@ function parseArgs(argv) {
 		pruneDocker: true,
 		nodeImage: DEFAULT_NODE_IMAGE,
 		timeoutSec: 1800,
+		evalParallel: 1,
 	};
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i];
@@ -97,6 +98,7 @@ function parseArgs(argv) {
 		else if (arg === "--limit") args.limit = Number.parseInt(argv[++i], 10);
 		else if (arg === "--variant") args.variant = argv[++i];
 		else if (arg === "--timeout-sec") args.timeoutSec = Number.parseInt(argv[++i], 10);
+		else if (arg === "--eval-parallel") args.evalParallel = Number.parseInt(argv[++i], 10);
 		else if (arg === "--node-image") args.nodeImage = argv[++i];
 		else if (arg === "--run-agent") args.runAgent = true;
 		else if (arg === "--run-evaluation") args.runEvaluation = true;
@@ -140,6 +142,7 @@ Options:
   --preflight-only            Run Docker/API preflight and exit
   --no-prune-docker           Skip Docker build-cache prune after each task
   --timeout-sec <n>           Per-agent Docker timeout, default: 1800
+  --eval-parallel <n>         Parallel SWE-bench eval workers, default: 1
   --env-file <path>           dotenv file passed to Docker, default: .env
 `);
 }
@@ -885,6 +888,7 @@ function runEvaluation(args, variant, tasks) {
 	const reportDir = join(args.evaluationRoot, variant.name);
 	ensureDir(reportDir);
 	const instanceIds = tasks.map((task) => task.instance_id);
+	const maxWorkers = Math.min(tasks.length, Math.max(1, args.evalParallel ?? 1));
 	const result = run(
 		"uvx",
 		[
@@ -900,7 +904,7 @@ function runEvaluation(args, variant, tasks) {
 			"--run_id",
 			runId,
 			"--max_workers",
-			"1",
+			String(maxWorkers),
 			"--namespace",
 			"none",
 			"--report_dir",
