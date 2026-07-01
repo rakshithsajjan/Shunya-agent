@@ -6,10 +6,16 @@
   - Configured a clean Dockerized test harness on the Hetzner VPS (root@hermes-hetzner) to execute both variants inside matched SWE-bench task containers.
   - Patched and verified the API connection key preflight verification using the new OpenAI key inside Docker.
   - Initiated an unattended 20-task run for both pi-native (Vanilla Pi with goal plugin + cost-logger.ts extension only) and shunya (Shunya with goal plugin + cost-logger.ts + shunya.ts + --shunya flag).
-  - Collected early benchmark results on the first completed task pairs:
-    - Total Cost Savings: Shunya averages 24.34% total cost reduction across completed pairs (astropy-12907 saved 13.0%, astropy-14182 saved 30.7%, astropy-14365 saved 46.9%, astropy-6938 saved 25.4%).
-    - Task Quality: On astropy-7746, pi-native failed to produce a patch (Patch: False) after 6 API calls, whereas shunya completed the task successfully (Patch: True) in 13 API calls.
-  - The benchmark is actively running task 7/20 in the background.
+  - Completed the full 20-task benchmark run in matched Docker containers on the VPS.
+  - Collected final cost and correctness metrics:
+    - Cost Savings: Shunya averages 20.6% cost reduction across Astropy tasks, but suffers a 9.9% cost overhead across all 20 tasks due to prompt schemas and system guidelines overhead on short Django tasks.
+    - Task Correctness (SWE-bench):
+      - Vanilla Pi resolved 15 out of 20 tasks (75.0%).
+      - Shunya resolved 13 out of 20 tasks (65.0%).
+      - Context compression caused Shunya to fail on two Astropy tasks (astropy-14182, astropy-14365) which Vanilla Pi resolved successfully.
+  - Wrote comparison reports locally:
+    - CSV: dev-notes/benchmark/results/swebench-lite-vps-docker-20/results-20-tasks.csv
+    - Summary: dev-notes/benchmark/results/swebench-lite-vps-docker-20/summary-20-tasks.md
 
 ## 2026-06-30
 
