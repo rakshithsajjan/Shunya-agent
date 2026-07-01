@@ -143,8 +143,8 @@ function run(command, commandArgs, options = {}) {
 			[
 				`Command failed: ${command} ${commandArgs.join(" ")}`,
 				result.error ? String(result.error) : "",
-				result.stdout.trim(),
-				result.stderr.trim(),
+				(result.stdout ?? "").trim(),
+				(result.stderr ?? "").trim(),
 			]
 				.filter(Boolean)
 				.join("\n"),
