@@ -12,14 +12,23 @@ const DEFAULT_TRACE_ROOT = "dev-notes/benchmark/results/swebench-lite-v1/traces"
 const DEFAULT_SESSION_ROOT = "dev-notes/benchmark/results/swebench-lite-v1/sessions";
 const DEFAULT_EVALUATION_ROOT = "dev-notes/benchmark/swebench-eval-runs";
 const DEFAULT_GOAL_EXTENSION = ".pi/npm/node_modules/@narumitw/pi-goal/src/goal.ts";
-const DEFAULT_PROVIDER = "openai";
-const DEFAULT_MODEL = "gpt-5.4-mini";
-const DEFAULT_PRICING = {
-	currency: "USD",
-	input_per_1m_tokens: 0.75,
-	cache_read_per_1m_tokens: 0.075,
-	cache_write_per_1m_tokens: 0,
-	output_per_1m_tokens: 4.5,
+const DEFAULT_PROVIDER = "deepseek";
+const DEFAULT_MODEL = "deepseek-v4-pro";
+const PRICING_SNAPSHOTS = {
+	"openai:gpt-5.4-mini": {
+		currency: "USD",
+		input_per_1m_tokens: 0.75,
+		cache_read_per_1m_tokens: 0.075,
+		cache_write_per_1m_tokens: 0,
+		output_per_1m_tokens: 4.5,
+	},
+	"deepseek:deepseek-v4-pro": {
+		currency: "USD",
+		input_per_1m_tokens: 0.435,
+		cache_read_per_1m_tokens: 0.003625,
+		cache_write_per_1m_tokens: 0,
+		output_per_1m_tokens: 0.87,
+	},
 };
 
 function parseArgs(argv) {
@@ -89,8 +98,8 @@ official SWE-bench Docker evaluator when the swebench Python package is present.
 Options:
   --limit <n>                 Number of pinned tasks to process
   --variant <name>            pi-native, shunya, or both
-  --provider <name>           Pi provider, default: openai
-  --model <name>              Pi model, default: gpt-5.4-mini
+  --provider <name>           Pi provider, default: deepseek
+  --model <name>              Pi model, default: deepseek-v4-pro
   --run-agent                 Run pi -p against each task workspace
   --run-evaluation            Run uvx --from swebench python -m swebench.harness.run_evaluation
   --evaluation-root <path>    Root containing SWE-bench evaluator reports
@@ -297,7 +306,17 @@ function collectAssistantText(messages) {
 	return content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
 }
 
-function usageFromSession(messages) {
+function pricingSnapshot(provider, model) {
+	return PRICING_SNAPSHOTS[`${provider}:${model}`] ?? {
+		currency: "USD",
+		input_per_1m_tokens: 0,
+		cache_read_per_1m_tokens: 0,
+		cache_write_per_1m_tokens: 0,
+		output_per_1m_tokens: 0,
+	};
+}
+
+function usageFromSession(args, messages) {
 	const calls = [];
 	let index = 0;
 	for (const entry of messages) {
@@ -324,7 +343,7 @@ function usageFromSession(messages) {
 				reasoning_tokens: reasoningTokens,
 				total_tokens: usage.totalTokens ?? inputTokens + cachedInputTokens + cacheWriteTokens + outputTokens,
 			},
-			pricing_snapshot: DEFAULT_PRICING,
+			pricing_snapshot: pricingSnapshot(message.provider ?? args.provider, message.model ?? args.model),
 			cost_usd: usage.cost?.total ?? 0,
 		});
 	}
@@ -352,7 +371,7 @@ function writeTrace(args, config, variant, task, row, workspace, sessionFile, st
 	const sessionEntries = sessionFile ? readJsonl(sessionFile) : [];
 	const patchResult = run("git", ["diff", "--binary"], { cwd: workspace, captureOnly: true });
 	const patch = patchResult.stdout;
-	const apiCalls = usageFromSession(sessionEntries);
+	const apiCalls = usageFromSession(args, sessionEntries);
 	const tracePath = join(args.traceRoot, variant.name, `${task.instance_id}.trace.json`);
 	ensureDir(dirname(tracePath));
 	writeJson(tracePath, {

@@ -2,6 +2,24 @@
 
 ## 2026-07-01
 
+- DeepSeek benchmark harness setup:
+  - Switched the SWE-bench local and Docker harness defaults from
+    `openai`/`gpt-5.4-mini` to `deepseek`/`deepseek-v4-pro`.
+  - Updated DeepSeek V4 Pro pricing defaults from the generated model catalog
+    and changed benchmark suite submission directories to model-specific
+    DeepSeek paths.
+  - Updated Docker preflight to use `https://api.deepseek.com/models` and
+    require `DEEPSEEK_API_KEY` when `--provider deepseek` is selected.
+  - Preserved support for both `openai:gpt-5.4-mini` and
+    `deepseek:deepseek-v4-pro` pricing snapshots so override runs keep correct
+    cost accounting.
+  - Verified `DEEPSEEK_API_KEY` is present in `.env` without exposing its
+    value. A two-call DeepSeek V4 Pro probe returned usage fields including
+    `prompt_tokens`, `completion_tokens`, `total_tokens`,
+    `prompt_tokens_details.cached_tokens`, `prompt_cache_hit_tokens`, and
+    `prompt_cache_miss_tokens`.
+  - Validation: `npm run check` passed after the harness changes.
+
 - Guidance cleanup:
   - Trimmed `GOAL.md` into a lean research north star focused on token
     efficiency, current SWE-bench retention experiments, metrics, and success

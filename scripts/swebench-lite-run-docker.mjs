@@ -351,7 +351,7 @@ function ensureRunnerImage(args, task) {
 	];
 	if (needsOpencode) {
 		dockerfileLines.push(
-			"RUN npm install -g opencode-ai opencode-goal-plugin @opencode-ai/plugin --ignore-scripts",
+			"RUN npm install -g opencode-ai opencode-goal-plugin @opencode-ai/plugin 2>&1",
 		);
 	}
 	dockerfileLines.push("", "WORKDIR /testbed", "");
